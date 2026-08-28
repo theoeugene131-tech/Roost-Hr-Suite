@@ -70,6 +70,7 @@ function migrateState(s){
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
+    if(e.passportPhoto===undefined){ e.passportPhoto=null; changed=true; }
     DOC_TYPES.forEach(dt=>{ if(e.documents[dt.key]===undefined) e.documents[dt.key]=null; });
   });
   return s;
@@ -86,7 +87,7 @@ function seedDemo(){
   ];
   const employees=team.map(([name,role,gross,startDate,dob],i)=>({
     id:uid(),name,role,gross,bank:'GTBank',account:'0123456789',startDate,dob,active:true,color:AVATAR_COLORS[i%AVATAR_COLORS.length],
-    nin:'', payeTin:'', nhfNumber:'', pensionPin:'', nsitfNumber:'', documents:{}
+    nin:'', payeTin:'', nhfNumber:'', pensionPin:'', nsitfNumber:'', passportPhoto:null, documents:{}
   }));
   employees.forEach(e=> DOC_TYPES.forEach(dt=> e.documents[dt.key]=null));
   // seed some docs for demo
@@ -280,7 +281,7 @@ function Overview({state,setModal}){
     <div className="grid">{state.employees.map(e=>{
       const d=estimateDeductions(e.gross);
       const progress=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
-      return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color}}>{initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(32,21,38,0.15)'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}</div></div><div style={{fontSize:10,background:progress===100?'var(--teal)':progress>50?'var(--gold)':'rgba(226,115,91,0.2)',color:progress===100?'#fff':progress>50?'#fff':'#8C3B28',padding:'4px 6px',borderRadius:20,fontFamily:'IBM Plex Mono'}}>{progress}% docs</div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
+      return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(32,21,38,0.15)'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}</div></div><div style={{fontSize:10,background:progress===100?'var(--teal)':progress>50?'var(--gold)':'rgba(226,115,91,0.2)',color:progress===100?'#fff':progress>50?'#fff':'#8C3B28',padding:'4px 6px',borderRadius:20,fontFamily:'IBM Plex Mono'}}>{progress}% docs</div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
       <div style={{height:4,background:'rgba(32,21,38,0.1)',borderRadius:4,overflow:'hidden'}}><div style={{width:`${progress}%`,height:'100%',background:'var(--teal)'}} /></div>
       </div>;
     })}</div>
@@ -293,7 +294,7 @@ function Team({state,update,setModal,showToast}){
       <div className="grid">{state.employees.map(e=>{
         const d=estimateDeductions(e.gross);
         const progress=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
-        return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color}}>{initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',color:'#201526',textDecoration:'underline'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}{e.active?'':' · inactive'} · {progress}% docs</div></div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross monthly</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
+        return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',color:'#201526',textDecoration:'underline'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}{e.active?'':' · inactive'} · {progress}% docs</div></div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross monthly</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
         <div style={{display:'flex',gap:6,marginTop:2,flexWrap:'wrap'}}><button onClick={()=>setModal({type:'staffDocs',data:e.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer'}}>📄 Docs</button><button onClick={()=>setModal({type:'employee',data:e.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>Edit</button><button onClick={()=>update(s=>{const emp=s.employees.find(x=>x.id===e.id); emp.active=!emp.active;})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>{e.active?'Deactivate':'Reactivate'}</button><button onClick={()=>{ if(confirm('Remove this teammate?')) update(s=>{s.employees=s.employees.filter(x=>x.id!==e.id);}); showToast('Removed');}} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.5)',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#E2735B'}}>Remove</button></div></div>;
       })}</div>
     }
@@ -327,7 +328,7 @@ function Documents({state,update,setModal,showToast,docFilter,setDocFilter}){
           {state.employees.map(e=>{
             const pct=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
             return <tr key={e.id} style={{borderBottom:'1px solid rgba(32,21,38,0.07)',cursor:'pointer'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>
-              <td style={{padding:'8px 10px',fontWeight:600,position:'sticky',left:0,background:'#EDEEF2',display:'flex',gap:8,alignItems:'center'}}><span style={{width:28,height:28,borderRadius:'50%',background:e.color,color:'#fff',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11}}>{initials(e.name)}</span>{e.name}<span style={{fontSize:10,opacity:0.55,marginLeft:4}}>{e.role}</span></td>
+              <td style={{padding:'8px 10px',fontWeight:600,position:'sticky',left:0,background:'#EDEEF2',display:'flex',gap:8,alignItems:'center'}}><span style={{width:28,height:28,borderRadius:'50%',background:e.color,color:'#fff',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,overflow:'hidden',flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</span>{e.name}<span style={{fontSize:10,opacity:0.55,marginLeft:4}}>{e.role}</span></td>
               {shown.map(dt=>{
                 const doc=e.documents?.[dt.key];
                 return <td key={dt.key} style={{textAlign:'center',padding:'6px'}}><span style={{display:'inline-flex',width:22,height:22,borderRadius:'50%',alignItems:'center',justifyContent:'center',fontSize:12, background: doc?'#4C8577':'rgba(32,21,38,0.08)',color:doc?'#fff':'#8C3B28'}}>{doc?'✓':'·'}</span></td>;
@@ -492,7 +493,7 @@ function Hiring({state,update,setModal,showToast}){
       {stages.map(stage=>{
         const inStage=state.candidates.filter(c=>c.stage===stage);
         return <div key={stage} style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:12,minWidth:160}}><h4 style={{fontSize:11.5,textTransform:'uppercase',color:'var(--muted)',marginBottom:10}}>{stage} ({inStage.length})</h4>
-          {inStage.map(c=><div key={c.id} style={{background:'var(--paper)',color:'var(--ink)',borderRadius:6,padding:'10px 12px',marginBottom:8,fontSize:12.5}}><div style={{fontWeight:600}}>{c.name}</div><div style={{opacity:0.6,fontSize:11}}>{c.role}</div><select value={c.stage} onChange={e=>update(s=>{s.candidates.find(x=>x.id===c.id).stage=e.target.value;})} style={{width:'100%',marginTop:8,fontSize:11,padding:5,borderRadius:4,border:'1px solid rgba(32,21,38,0.2)',background:'#fff'}}>{stages.map(s=><option key={s} value={s}>{s}</option>)}</select>{c.stage==='Offer' && <button onClick={()=>{update(s=>{const cand=s.candidates.find(x=>x.id===c.id); cand.stage='Hired'; s.employees.push({id:uid(),name:cand.name,role:cand.role,gross:0,bank:'',account:'',startDate:new Date().toISOString().slice(0,10),dob:'',active:true,color:AVATAR_COLORS[s.employees.length%AVATAR_COLORS.length], nin:'',payeTin:'',nhfNumber:'',pensionPin:'',nsitfNumber:'', documents: Object.fromEntries(DOC_TYPES.map(dt=>[dt.key,null]))});}); showToast(`${c.name} hired — set salary in Team`);}} style={{width:'100%',marginTop:6,background:'var(--teal)',color:'#fff',border:'none',borderRadius:4,padding:6,fontSize:11,cursor:'pointer'}}>Mark hired</button>}</div>)}
+          {inStage.map(c=><div key={c.id} style={{background:'var(--paper)',color:'var(--ink)',borderRadius:6,padding:'10px 12px',marginBottom:8,fontSize:12.5}}><div style={{fontWeight:600}}>{c.name}</div><div style={{opacity:0.6,fontSize:11}}>{c.role}</div><select value={c.stage} onChange={e=>update(s=>{s.candidates.find(x=>x.id===c.id).stage=e.target.value;})} style={{width:'100%',marginTop:8,fontSize:11,padding:5,borderRadius:4,border:'1px solid rgba(32,21,38,0.2)',background:'#fff'}}>{stages.map(s=><option key={s} value={s}>{s}</option>)}</select>{c.stage==='Offer' && <button onClick={()=>{update(s=>{const cand=s.candidates.find(x=>x.id===c.id); cand.stage='Hired'; s.employees.push({id:uid(),name:cand.name,role:cand.role,gross:0,bank:'',account:'',startDate:new Date().toISOString().slice(0,10),dob:'',active:true,color:AVATAR_COLORS[s.employees.length%AVATAR_COLORS.length], nin:'',payeTin:'',nhfNumber:'',pensionPin:'',nsitfNumber:'', passportPhoto:null, documents: Object.fromEntries(DOC_TYPES.map(dt=>[dt.key,null]))});}); showToast(`${c.name} hired — set salary in Team`);}} style={{width:'100%',marginTop:6,background:'var(--teal)',color:'#fff',border:'none',borderRadius:4,padding:6,fontSize:11,cursor:'pointer'}}>Mark hired</button>}</div>)}
         </div>;
       })}
     </div>
@@ -576,10 +577,29 @@ function Modal({modal,setModal,state,update,showToast}){
     const pct=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
     const grouped={};
     DOC_TYPES.forEach(dt=>{ if(!grouped[dt.category]) grouped[dt.category]=[]; grouped[dt.category].push(dt); });
+    async function handlePassport(file){
+      if(!file) return;
+      if(file.size>4*1024*1024){ alert('Passport photo too large — max 4MB'); return; }
+      if(!file.type.startsWith('image/')){ alert('Please upload an image (JPG/PNG)'); return; }
+      const reader=new FileReader();
+      reader.onload=()=>{
+        update(s=>{ s.employees.find(x=>x.id===e.id).passportPhoto=reader.result; });
+        showToast('Passport photo uploaded');
+      };
+      reader.readAsDataURL(file);
+    }
     return (
       <div className="overlay" onClick={e2=>{if(e2.target.classList.contains('overlay')) close();}}>
         <div className="modal" style={{maxWidth:720}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><div><h3 style={{fontFamily:'Newsreader',fontSize:20,fontWeight:600}}>{e.name}</h3><p style={{fontSize:12,opacity:0.6}}>{e.role} · {pct}% docs complete</p></div><button onClick={close} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,opacity:0.55}}>✕</button></div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><div style={{display:'flex',gap:14,alignItems:'center'}}>
+            <div style={{width:64,height:64,borderRadius:'50%',overflow:'hidden',background:e.color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,border:'2px solid rgba(32,21,38,0.1)'}}>
+              {e.passportPhoto ? <img src={e.passportPhoto} alt="passport" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{color:'#fff',fontFamily:'Newsreader',fontWeight:700,fontSize:20}}>{initials(e.name)}</span>}
+            </div>
+            <div><h3 style={{fontFamily:'Newsreader',fontSize:20,fontWeight:600}}>{e.name}</h3><p style={{fontSize:12,opacity:0.6}}>{e.role} · {pct}% docs complete</p>
+              <label style={{fontSize:11,background:'var(--paper-dim)',padding:'4px 8px',borderRadius:5,cursor:'pointer',marginTop:6,display:'inline-block'}}>📷 {e.passportPhoto?'Change':'Upload'} passport photo<input type="file" accept="image/*" style={{display:'none'}} onChange={ev=>handlePassport(ev.target.files[0])}/></label>
+              {e.passportPhoto && <button onClick={()=>update(s=>s.employees.find(x=>x.id===e.id).passportPhoto=null)} style={{fontSize:11,marginLeft:6,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'4px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>}
+            </div>
+          </div><button onClick={close} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,opacity:0.55,height:32}}>✕</button></div>
           <div style={{height:6,background:'rgba(32,21,38,0.1)',borderRadius:6,overflow:'hidden',marginBottom:16}}><div style={{width:`${pct}%`,height:'100%',background:'var(--teal)'}}/></div>
 
           <div style={{background:'rgba(32,21,38,0.05)',borderRadius:8,padding:14,marginBottom:16}}>
