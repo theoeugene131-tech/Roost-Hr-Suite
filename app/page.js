@@ -5,6 +5,7 @@ import { loadState, saveState } from "@/lib/store";
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOC_TYPES = [
+  {key:'passport', label:'Passport Photo', category:'Onboarding', required:true},
   {key:'cv', label:'CV / Resume', category:'Onboarding', required:true},
   {key:'offer', label:'Offer Letter / Contract', category:'Onboarding', required:true},
   {key:'acceptance', label:'Acceptance Letter', category:'Onboarding', required:true},
@@ -72,6 +73,9 @@ function migrateState(s){
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
     if(e.passportPhoto===undefined){ e.passportPhoto=null; changed=true; }
     DOC_TYPES.forEach(dt=>{ if(e.documents[dt.key]===undefined) e.documents[dt.key]=null; });
+    // sync avatar ↔ passport doc — passport photo hits profile picture
+    if(e.passportPhoto && !e.documents['passport']){ e.documents['passport']={fileName:'passport.jpg', size:0, uploadedAt: new Date().toISOString().slice(0,10), dataUrl:e.passportPhoto, status:'verified'}; changed=true; }
+    if(e.documents['passport']?.dataUrl && !e.passportPhoto){ e.passportPhoto=e.documents['passport'].dataUrl; changed=true; }
   });
   return s;
 }
@@ -564,13 +568,15 @@ function Modal({modal,setModal,state,update,showToast}){
   async function handleUpload(docKey, file){
     if(!file) return;
     if(file.size>6*1024*1024){ alert('File too large — max 6MB (offline storage limit)'); return; }
+    if(docKey==='passport' && file.type && !file.type.startsWith('image/')){ alert('Passport photo must be an image (JPG/PNG)'); return; }
     const reader=new FileReader();
     reader.onload=()=>{
       update(s=>{
         const emp=s.employees.find(x=>x.id===modal.data);
         emp.documents[docKey]={fileName:file.name, size:file.size, uploadedAt:new Date().toISOString().slice(0,10), dataUrl: reader.result, status:'pending'};
+        if(docKey==='passport'){ emp.passportPhoto=reader.result; }
       });
-      showToast(`${DOC_TYPES.find(d=>d.key===docKey).label} uploaded — offline saved`);
+      showToast(`${DOC_TYPES.find(d=>d.key===docKey).label} uploaded — ${docKey==='passport'?'profile picture updated': 'offline saved'}`);
     };
     reader.readAsDataURL(file);
   }
@@ -586,8 +592,8 @@ function Modal({modal,setModal,state,update,showToast}){
       if(!file.type.startsWith('image/')){ alert('Please upload an image (JPG/PNG)'); return; }
       const reader=new FileReader();
       reader.onload=()=>{
-        update(s=>{ s.employees.find(x=>x.id===e.id).passportPhoto=reader.result; });
-        showToast('Passport photo uploaded');
+        update(s=>{ const emp=s.employees.find(x=>x.id===e.id); emp.passportPhoto=reader.result; emp.documents['passport']={fileName:file.name, size:file.size, uploadedAt:new Date().toISOString().slice(0,10), dataUrl:reader.result, status:'pending'}; });
+        showToast('Passport photo uploaded — profile updated');
       };
       reader.readAsDataURL(file);
     }
@@ -600,7 +606,7 @@ function Modal({modal,setModal,state,update,showToast}){
             </div>
             <div><h3 style={{fontFamily:'Newsreader',fontSize:20,fontWeight:600}}>{e.name}</h3><p style={{fontSize:12,opacity:0.6}}>{e.role} · {pct}% docs complete</p>
               <label style={{fontSize:11,background:'var(--paper-dim)',padding:'4px 8px',borderRadius:5,cursor:'pointer',marginTop:6,display:'inline-block'}}>📷 {e.passportPhoto?'Change':'Upload'} passport photo<input type="file" accept="image/*" style={{display:'none'}} onChange={ev=>handlePassport(ev.target.files[0])}/></label>
-              {e.passportPhoto && <button onClick={()=>update(s=>s.employees.find(x=>x.id===e.id).passportPhoto=null)} style={{fontSize:11,marginLeft:6,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'4px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>}
+              {e.passportPhoto && <button onClick={()=>update(s=>{ const emp=s.employees.find(x=>x.id===e.id); emp.passportPhoto=null; emp.documents['passport']=null; })} style={{fontSize:11,marginLeft:6,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'4px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>}
             </div>
           </div><button onClick={close} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,opacity:0.55,height:32}}>✕</button></div>
           <div style={{height:6,background:'rgba(32,21,38,0.1)',borderRadius:6,overflow:'hidden',marginBottom:16}}><div style={{width:`${pct}%`,height:'100%',background:'var(--teal)'}}/></div>
