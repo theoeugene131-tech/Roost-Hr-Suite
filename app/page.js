@@ -235,6 +235,9 @@ export default function Page(){
         {currentTab==='reports' && <Reports state={state} />}
         {currentTab==='myprofile' && <MyProfile state={state} />}
       </main>
+      <footer style={{borderTop:'1px solid var(--line)',padding:'16px 40px',textAlign:'center',fontSize:12,color:'var(--muted)',background:'rgba(0,0,0,0.15)'}}>
+        Developed by <span style={{color:'var(--paper)',fontWeight:600}}>Next Level Global</span> · Contact <a href="https://wa.me/2348026892077" target="_blank" rel="noopener noreferrer" style={{color:'#25D366',textDecoration:'none',fontWeight:600}}>WhatsApp +234 802 689 2077</a> · Roost works offline
+      </footer>
 
       {modal && <Modal modal={modal} setModal={setModal} state={state} update={update} showToast={showToast} />}
     </>

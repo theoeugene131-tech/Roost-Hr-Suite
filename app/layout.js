@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Roost — Payroll for Small Teams",
-  description: "HR, Payroll & Compliance for teams of 5-20. Works online and offline.",
+  title: "Roost — Payroll for Small Teams | Next Level Global",
+  description: "HR, Payroll & Compliance for teams of 5-20. Works online and offline. Developed by Next Level Global — WhatsApp +2348026892077",
   manifest: "/manifest.json",
   themeColor: "#241623",
 };
