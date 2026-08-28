@@ -6,7 +6,7 @@ const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOC_TYPES = [
   {key:'cv', label:'CV / Resume', category:'Onboarding', required:true},
-  {key:'offer', label:'Offer Letter', category:'Onboarding', required:true},
+  {key:'offer', label:'Offer Letter / Contract', category:'Onboarding', required:true},
   {key:'acceptance', label:'Acceptance Letter', category:'Onboarding', required:true},
   {key:'deployment', label:'Deployment to Unit', category:'Onboarding', required:true},
   {key:'jd', label:'Job Description', category:'Onboarding', required:true},
