@@ -1,0 +1,31 @@
+SELAR DEPLOY — Roost SaaS License (Secure)
+
+Live app: https://roost-hr-suite.vercel.app
+Repo (keep Private): https://github.com/theoeugene131-tech/Roost-Hr-Suite
+
+1) Create product on Selar.co
+   - Title: Roost — HR, Payroll & Compliance (Offline) by Next Level Global
+   - Price NGN (e.g. 25,000 / 50,000 annual)
+   - Description: copy from README.md, mention offline, payroll calc, docs repo, passport, printable schedule
+   - Cover: screenshot from Vercel
+
+2) Delivery File (Selar → Settings → Delivery)
+   Upload a PDF/TXT with:
+     Thank you! Your Roost license key: {{license_key}}
+     Access: https://roost-hr-suite.vercel.app?license={{license_key}}
+     Paste key if asked. WhatsApp: +2348026892077
+
+   Or let Selar webhook auto-generate: set webhook URL to:
+     https://roost-hr-suite.vercel.app/api/selar-webhook
+   The webhook POSTs on purchase and returns {key: "ROOST-XXXX-..."} — store/log it.
+
+3) Verify: Buyer enters key → app calls POST /api/verify → if valid, unlocks. Offline: last valid key cached in localStorage.
+
+4) Secure hosting:
+   - Vercel: Settings → Environment Variables → SELAR_API_KEY, SELAR_WEBHOOK_SECRET (optional)
+   - Build is minified (Next.js), no env leaks, GitHub stays Private
+   - Rotate keys via /api/verify DB check (currently mockaccepts any ROOST-xxxx; replace with DB lookup in app/api/verify/route.js:5)
+
+5) Test: open https://roost-hr-suite.vercel.app?demo=1 to bypass for owner testing. Real buyers use their ROOST- key.
+
+Quick generate test key locally: node -e "console.log('ROOST-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase())"

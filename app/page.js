@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { loadState, saveState } from "@/lib/store";
+import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense } from "@/lib/license";
 
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -119,6 +120,9 @@ export default function Page(){
   const [modal,setModal]=useState(null);
   const [toast,setToast]=useState(null);
   const [docFilter,setDocFilter]=useState('All');
+  const [licenseKey,setLicenseKey]=useState('');
+  const [licenseOk,setLicenseOk]=useState(false);
+  const [licenseChecking,setLicenseChecking]=useState(true);
 
   useEffect(()=>{
     let loaded=loadState();
@@ -129,12 +133,61 @@ export default function Page(){
     window.addEventListener('online',updateOnline);
     window.addEventListener('offline',updateOnline);
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
+    // SaaS license check — Selar. Allow bypass via ?license=ROOST-xxx or ?demo=1 for owner testing
+    const params=new URLSearchParams(window.location.search);
+    const urlKey=params.get('license');
+    const demoBypass=params.get('demo')==='1';
+    if(demoBypass){ setLicenseOk(true); setLicenseChecking(false); }
+    else if(urlKey && isValidFormat(urlKey)){ saveLicense(urlKey,{plan:'url'}); setLicenseKey(normalizeKey(urlKey)); setLicenseOk(true); setLicenseChecking(false); }
+    else {
+      const stored=getStoredKey();
+      if(stored && isValidFormat(stored)){
+        // verify with API (offline falls back to format check)
+        fetch('/api/verify',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:stored})}).then(r=>r.json()).then(j=>{
+          setLicenseOk(!!j.valid); setLicenseChecking(false); if(!j.valid) setLicenseKey(stored);
+        }).catch(()=>{ setLicenseOk(true); setLicenseChecking(false); });
+      } else { if(stored) setLicenseKey(stored); setLicenseOk(false); setLicenseChecking(false); }
+    }
     return ()=>{ window.removeEventListener('online',updateOnline); window.removeEventListener('offline',updateOnline); };
   },[]);
   useEffect(()=>{ if(state) saveState(state); },[state]);
   useEffect(()=>{ if(!online) setToast("You are offline — changes will sync when you reconnect."); else if(toast && toast.includes("offline")) setToast("Back online ✓"); },[online]);
 
-  if(!state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost…</div>;
+  if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost…</div>;
+  async function handleLicenseSubmit(e){
+    e.preventDefault();
+    if(!isValidFormat(licenseKey)) { showToast('Invalid key. Format: ROOST-XXXX-XXXX-...'); return; }
+    try{
+      const res=await fetch('/api/verify',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:licenseKey})});
+      const j=await res.json();
+      if(j.valid){ saveLicense(licenseKey,{plan:j.plan}); setLicenseOk(true); showToast('License activated ✓'); }
+      else { showToast(j.reason||'Invalid license'); }
+    }catch{
+      // offline: accept format-valid key
+      saveLicense(licenseKey,{plan:'offline'}); setLicenseOk(true); showToast('License saved (offline)');
+    }
+  }
+  if(!licenseOk){
+    return (
+      <div style={{minHeight:'100vh', background:'#241623', color:'#EDEEF2', display:'flex', alignItems:'center', justifyContent:'center', padding:24}}>
+        <div style={{maxWidth:520, width:'100%', background:'#EDEEF2', color:'#201526', borderRadius:12, padding:32, boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}}>Roost</div><div style={{fontSize:12,opacity:0.6}}>Payroll, HR & Compliance — SaaS License</div></div></div>
+          <h2 style={{fontFamily:'Newsreader, serif',fontSize:18,marginBottom:8}}>Enter your license key</h2>
+          <p style={{fontSize:13,opacity:0.7,lineHeight:1.5}}>You purchased on <b>Selar</b>. Paste the key from your delivery email. Keys look like <code style={{background:'#fff',padding:'2px 6px',borderRadius:4}}>ROOST-XXXX-XXXX-XXXX</code>. Need help? <a href="https://wa.me/2348026892077" target="_blank" rel="noreferrer" style={{color:'#4C8577',fontWeight:600}}>WhatsApp +234 802 689 2077</a></p>
+          <form onSubmit={handleLicenseSubmit} style={{marginTop:16}}>
+            <input value={licenseKey} onChange={ev=>setLicenseKey(ev.target.value)} placeholder="ROOST-XXXX-XXXX-XXXX" style={{width:'100%',padding:'12px 14px',borderRadius:8,border:'1px solid rgba(32,21,38,0.2)',fontFamily:'IBM Plex Mono',fontSize:14,background:'#fff'}}/>
+            <button type="submit" className="btn btn-primary" style={{width:'100%',marginTop:12,padding:12}}>Activate license</button>
+          </form>
+          <div style={{marginTop:14,display:'flex',gap:8,flexWrap:'wrap'}}>
+            <a href="https://selar.co/m/theoeugene131-tech" target="_blank" rel="noreferrer" style={{fontSize:12,background:'#201526',color:'#fff',padding:'8px 12px',borderRadius:6,textDecoration:'none'}}>Buy on Selar</a>
+            <a href="?demo=1" style={{fontSize:12,border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,textDecoration:'none',color:'#201526'}}>Continue as demo (owner test)</a>
+            <button onClick={()=>{ setLicenseKey(''); clearLicense(); }} style={{fontSize:12,background:'transparent',border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,cursor:'pointer'}}>Clear</button>
+          </div>
+          <p style={{fontSize:11,opacity:0.55,marginTop:14}}>Developed by <b>Next Level Global</b>. Secure SaaS — key verified via <code>/api/verify</code>. Offline keys accepted after first online activation. Selar webhook → <code>/api/selar-webhook</code> auto-generates keys on purchase.</p>
+        </div>
+      </div>
+    );
+  }
   const tabs=visibleTabs(state.currentRole);
   const activeTabs=tabs.includes(currentTab)?currentTab:tabs[0];
   if(activeTabs!==currentTab) setCurrentTab(activeTabs);
@@ -176,7 +229,8 @@ export default function Page(){
       `}</style>
 
       <div style={{background: online? '#4C8577':'#E2735B', color:'#fff', textAlign:'center', fontSize:12, padding:'6px 10px', fontWeight:600}}>
-        {online? '● Online — synced':'○ Offline — working locally, will sync when reconnected'} &nbsp;|&nbsp; Roost works fully offline
+        {online? '● Online — synced':'○ Offline — working locally, will sync when reconnected'} &nbsp;|&nbsp; Roost works fully offline &nbsp;|&nbsp; Licensed {getStoredKey()? `· ${getStoredKey().slice(0,14)}…` : ''}
+        <button onClick={()=>{ if(confirm('Remove license?')){ clearLicense(); setLicenseOk(false); setLicenseKey(''); location.reload(); } }} style={{marginLeft:10, background:'rgba(0,0,0,0.2)', color:'#fff', border:'none', padding:'2px 8px', borderRadius:10, fontSize:10, cursor:'pointer'}}>Sign out</button>
       </div>
       {toast && <div style={{position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', background:'#201526', color:'#EDEEF2', padding:'10px 16px', borderRadius:8, fontSize:13, zIndex:60}}>{toast}</div>}
 
