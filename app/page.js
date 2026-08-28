@@ -433,13 +433,15 @@ function RunPayroll({state,update,setCurrentTab,showToast}){
   return (<>
     <div className="panel-head"><div><h2>Run payroll — {periodLabel(period)}</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Review before confirming. This will pay {active.length} active teammates.</p></div></div>
     <div className="run-row" style={{cursor:'default'}}>
-      {lines.map(l=><div key={l.emp.id} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'6px 0'}}><span>{l.emp.name} — {l.emp.role}</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>Net {money(l.net)}</span></div>)}
+      <div style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1.1fr',gap:8,padding:'6px 0 8px',fontSize:10,opacity:0.55,textTransform:'uppercase',letterSpacing:0.05+'em',borderBottom:'1px solid rgba(32,21,38,0.08)'}}><span>Staff</span><span>Account</span><span style={{textAlign:'right'}}>Net pay</span></div>
+      {lines.map(l=><div key={l.emp.id} style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1.1fr',gap:8,alignItems:'center',fontSize:12.5,padding:'8px 0',borderBottom:'1px solid rgba(32,21,38,0.05)'}}><span>{l.emp.name}<span style={{opacity:0.55}}> — {l.emp.role}</span></span><span style={{fontFamily:'IBM Plex Mono',fontSize:12}}>{l.emp.bank || '—'} · {l.emp.account || '—'}</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600,textAlign:'right'}}>{money(l.net)}</span></div>)}
       <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,borderTop:'1px solid rgba(32,21,38,0.15)',marginTop:6,paddingTop:12,fontSize:13}}><span>Total net pay</span><span style={{fontFamily:'IBM Plex Mono'}}>{money(netTotal)}</span></div>
       <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'6px 0'}}><span>Total cost to company (incl. employer pension)</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(total)}</span></div>
+      <div style={{fontSize:11,color:'rgba(32,21,38,0.55)',marginTop:6}}>Edit bank/account in Team → Edit. Pays to listed accounts.</div>
     </div>
     <button className="btn btn-primary" style={{marginTop:16}} onClick={()=>{
       update(s=>{
-        const lines2=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross,...d}; });
+        const lines2=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross, bank:e.bank, account:e.account, ...d}; });
         s.runs.push({id:uid(),period,createdAt:new Date().toISOString(),lines:lines2,status:'paid'});
       });
       showToast(`Payroll for ${periodLabel(period)} confirmed — works offline too`);
@@ -456,7 +458,10 @@ function History({state,expandedRun,setExpandedRun}){
       const open=expandedRun===r.id;
       return <div key={r.id} className="run-row" style={{cursor:'pointer'}} onClick={()=>setExpandedRun(open?null:r.id)}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div><div style={{fontFamily:'Newsreader',fontWeight:600,fontSize:16}}>{periodLabel(r.period)}</div><div style={{fontSize:12,opacity:0.6,marginTop:2}}>{r.lines.length} teammates · {new Date(r.createdAt).toLocaleDateString('en-NG')}</div></div><div style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(total)}</div></div>
-        {open && <div style={{marginTop:14,borderTop:'1px solid rgba(32,21,38,0.1)',paddingTop:12}}>{r.lines.map(l=><div key={l.employeeId} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'6px 0'}}><span>{l.name} — {l.role}</span><span style={{fontFamily:'IBM Plex Mono'}}>Net {money(l.net)}</span></div>)}</div>}
+        {open && <div style={{marginTop:14,borderTop:'1px solid rgba(32,21,38,0.1)',paddingTop:12}}>
+          <div style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1fr',gap:8,padding:'6px 0',fontSize:10,opacity:0.55,textTransform:'uppercase',letterSpacing:0.05+'em',borderBottom:'1px solid rgba(32,21,38,0.08)'}}><span>Staff</span><span>Account</span><span style={{textAlign:'right'}}>Net</span></div>
+          {r.lines.map(l=><div key={l.employeeId} style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1fr',gap:8,alignItems:'center',fontSize:12.5,padding:'6px 0'}}><span>{l.name}</span><span style={{fontFamily:'IBM Plex Mono',fontSize:11}}>{l.bank||'—'} · {l.account||'—'}</span><span style={{fontFamily:'IBM Plex Mono',textAlign:'right'}}>{money(l.net)}</span></div>)}
+        </div>}
       </div>;
     })}
   </>);
