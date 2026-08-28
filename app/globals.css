@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --bg:#241623;
+  --bg-2:#2E1D2D;
+  --paper:#EDEEF2;
+  --paper-dim:#E0E2E8;
+  --ink:#201526;
+  --coral:#E2735B;
+  --gold:#C9A227;
+  --teal:#4C8577;
+  --muted:#B39FB0;
+  --line:rgba(237,238,242,0.09);
+}
+html,body{background:var(--bg); color:var(--paper);}
+.mono{font-family:'IBM Plex Mono', monospace;}
