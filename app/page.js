@@ -423,6 +423,41 @@ function Regulatory({state,update}){
     </div>
   </>);
 }
+function printSchedule({companyName, period, lines}){
+  const totalNet=lines.reduce((s,l)=>s+(l.net||0),0);
+  const totalGross=lines.reduce((s,l)=>s+(l.gross||0),0);
+  const w=window.open('','_blank');
+  if(!w){ alert('Please allow pop-ups to print'); return; }
+  w.document.write(`
+  <html><head><title>Payment Schedule — ${periodLabel(period)}</title>
+  <style>
+    body{font-family:Inter, sans-serif; color:#1a1a1a; padding:32px; font-size:12px}
+    h1{font-family:Newsreader, serif; font-size:20px; margin:0}
+    h2{font-size:13px; color:#555; margin:4px 0 16px}
+    table{width:100%; border-collapse:collapse; margin-top:12px}
+    th{font-size:10px; text-transform:uppercase; letter-spacing:0.06em; text-align:left; padding:8px 6px; border-bottom:2px solid #222; background:#f3f3f3}
+    td{padding:8px 6px; border-bottom:1px solid #ddd; font-size:12px}
+    td.num{font-family:monospace; text-align:right}
+    .tot{font-weight:700; background:#f9f9f9}
+    .sign{margin-top:36px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; font-size:12px}
+    .sign div{border-top:1px solid #222; padding-top:6px}
+    .hdr{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #222; padding-bottom:12px}
+    @media print{ button{display:none} }
+  </style></head><body>
+  <div class="hdr"><div><h1>${companyName || 'Company'}</h1><h2>Monthly Payment Schedule — ${periodLabel(period)} &nbsp;|&nbsp; Generated ${new Date().toLocaleDateString('en-NG')} ${new Date().toLocaleTimeString()}</h2></div><div style="text-align:right; font-size:11px">Roost — Payroll for Small Teams<br/>Developed by Next Level Global · +2348026892077</div></div>
+  <table>
+    <thead><tr><th>#</th><th>Staff Name</th><th>Role</th><th>Bank</th><th>Account No.</th><th style="text-align:right">Gross</th><th style="text-align:right">PAYE</th><th style="text-align:right">Pension (8%)</th><th style="text-align:right">NHF</th><th style="text-align:right">Net Pay</th><th>Signature</th></tr></thead>
+    <tbody>
+      ${lines.map((l,i)=>`<tr><td>${i+1}</td><td>${l.name}</td><td>${l.role||''}</td><td>${l.bank||'—'}</td><td style="font-family:monospace">${l.account||'—'}</td><td class="num">${money(l.gross)}</td><td class="num">${money(l.monthlyPAYE||0)}</td><td class="num">${money(l.pensionEmployee||0)}</td><td class="num">${money(l.nhf||0)}</td><td class="num" style="font-weight:700">${money(l.net)}</td><td style="min-width:80px"></td></tr>`).join('')}
+      <tr class="tot"><td colspan="5" style="text-align:right">TOTAL</td><td class="num">${money(totalGross)}</td><td class="num">${money(lines.reduce((s,l)=>s+(l.monthlyPAYE||0),0))}</td><td class="num">${money(lines.reduce((s,l)=>s+(l.pensionEmployee||0),0))}</td><td class="num">${money(lines.reduce((s,l)=>s+(l.nhf||0),0))}</td><td class="num">${money(totalNet)}</td><td></td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:12px; font-size:11px; color:#555">Total Cost to Company (incl. 10% employer pension): <b>${money(lines.reduce((s,l)=>s+l.gross+(l.pensionEmployer||0),0))}</b> &nbsp;|&nbsp; ${lines.length} staff &nbsp;|&nbsp; Amount in words: ___________________________</div>
+  <div class="sign"><div>Prepared by<br/><br/><br/>Name / Signature / Date</div><div>Checked by Finance<br/><br/><br/>Name / Signature / Date</div><div>Approved by CEO<br/><br/><br/>Name / Signature / Date</div></div>
+  <div style="margin-top:24px; text-align:center"><button onclick="window.print()" style="padding:10px 18px; background:#201526; color:#fff; border:none; border-radius:6px; cursor:pointer">Print / Save as PDF</button> <button onclick="window.close()" style="padding:10px 18px; margin-left:8">Close</button></div>
+  </body></html>`);
+  w.document.close();
+}
 function RunPayroll({state,update,setCurrentTab,showToast}){
   const period=nextPeriod(state.runs);
   const active=state.employees.filter(e=>e.active);
@@ -430,8 +465,11 @@ function RunPayroll({state,update,setCurrentTab,showToast}){
   const lines=active.map(e=>({emp:e,...estimateDeductions(e.gross)}));
   const total=lines.reduce((s,l)=>s+l.emp.gross+l.pensionEmployer,0);
   const netTotal=lines.reduce((s,l)=>s+l.net,0);
+  const scheduleLines=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross,bank:e.bank,account:e.account,...d}; });
   return (<>
-    <div className="panel-head"><div><h2>Run payroll — {periodLabel(period)}</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Review before confirming. This will pay {active.length} active teammates.</p></div></div>
+    <div className="panel-head"><div><h2>Run payroll — {periodLabel(period)}</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Review before confirming. This will pay {active.length} active teammates.</p></div>
+      <div style={{display:'flex',gap:8}}><button className="btn" style={{background:'#fff',color:'#201526',border:'1px solid #ddd'}} onClick={()=>printSchedule({companyName: state.companyName, period, lines: scheduleLines})}>🖨 Printable schedule</button></div>
+    </div>
     <div className="run-row" style={{cursor:'default'}}>
       <div style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1.1fr',gap:8,padding:'6px 0 8px',fontSize:10,opacity:0.55,textTransform:'uppercase',letterSpacing:0.05+'em',borderBottom:'1px solid rgba(32,21,38,0.08)'}}><span>Staff</span><span>Account</span><span style={{textAlign:'right'}}>Net pay</span></div>
       {lines.map(l=><div key={l.emp.id} style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1.1fr',gap:8,alignItems:'center',fontSize:12.5,padding:'8px 0',borderBottom:'1px solid rgba(32,21,38,0.05)'}}><span>{l.emp.name}<span style={{opacity:0.55}}> — {l.emp.role}</span></span><span style={{fontFamily:'IBM Plex Mono',fontSize:12}}>{l.emp.bank || '—'} · {l.emp.account || '—'}</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600,textAlign:'right'}}>{money(l.net)}</span></div>)}
@@ -439,14 +477,17 @@ function RunPayroll({state,update,setCurrentTab,showToast}){
       <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,padding:'6px 0'}}><span>Total cost to company (incl. employer pension)</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(total)}</span></div>
       <div style={{fontSize:11,color:'rgba(32,21,38,0.55)',marginTop:6}}>Edit bank/account in Team → Edit. Pays to listed accounts.</div>
     </div>
-    <button className="btn btn-primary" style={{marginTop:16}} onClick={()=>{
-      update(s=>{
-        const lines2=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross, bank:e.bank, account:e.account, ...d}; });
-        s.runs.push({id:uid(),period,createdAt:new Date().toISOString(),lines:lines2,status:'paid'});
-      });
-      showToast(`Payroll for ${periodLabel(period)} confirmed — works offline too`);
-      setCurrentTab('history');
-    }}>Confirm & pay {periodLabel(period)}</button>
+    <div style={{display:'flex',gap:10,marginTop:16,flexWrap:'wrap'}}>
+      <button className="btn btn-primary" onClick={()=>{
+        update(s=>{
+          const lines2=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross, bank:e.bank, account:e.account, ...d}; });
+          s.runs.push({id:uid(),period,createdAt:new Date().toISOString(),lines:lines2,status:'paid'});
+        });
+        showToast(`Payroll for ${periodLabel(period)} confirmed — works offline too`);
+        setCurrentTab('history');
+      }}>Confirm & pay {periodLabel(period)}</button>
+      <button className="btn" style={{background:'#EDEEF2',color:'#201526'}} onClick={()=>printSchedule({companyName: state.companyName, period, lines: scheduleLines})}>🖨 Print payment schedule for Finance/CEO</button>
+    </div>
   </>);
 }
 function History({state,expandedRun,setExpandedRun}){
@@ -461,6 +502,7 @@ function History({state,expandedRun,setExpandedRun}){
         {open && <div style={{marginTop:14,borderTop:'1px solid rgba(32,21,38,0.1)',paddingTop:12}}>
           <div style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1fr',gap:8,padding:'6px 0',fontSize:10,opacity:0.55,textTransform:'uppercase',letterSpacing:0.05+'em',borderBottom:'1px solid rgba(32,21,38,0.08)'}}><span>Staff</span><span>Account</span><span style={{textAlign:'right'}}>Net</span></div>
           {r.lines.map(l=><div key={l.employeeId} style={{display:'grid',gridTemplateColumns:'1.2fr 1fr 1fr',gap:8,alignItems:'center',fontSize:12.5,padding:'6px 0'}}><span>{l.name}</span><span style={{fontFamily:'IBM Plex Mono',fontSize:11}}>{l.bank||'—'} · {l.account||'—'}</span><span style={{fontFamily:'IBM Plex Mono',textAlign:'right'}}>{money(l.net)}</span></div>)}
+          <div style={{marginTop:12,display:'flex',gap:8}}><button onClick={(ev)=>{ev.stopPropagation(); printSchedule({companyName: state.companyName, period: r.period, lines: r.lines});}} style={{fontSize:12,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:5,cursor:'pointer'}}>🖨 Printable schedule for Finance/CEO</button></div>
         </div>}
       </div>;
     })}
