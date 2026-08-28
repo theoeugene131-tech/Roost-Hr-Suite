@@ -1,0 +1,21 @@
+DEPLOY TO VERCEL (2 options):
+
+Option A — Vercel Dashboard (no CLI):
+1. Push to GitHub:
+   cd C:\Users\User\Downloads\roost
+   # create repo on github.com/new named "roost" (public, no README)
+   git remote add origin https://github.com/<YOUR_USERNAME>/roost.git
+   git push -u origin main
+2. Go to https://vercel.com/new
+3. Import the "roost" repository
+4. Framework: Next.js (auto-detected), Build = npm run build, Output = .next
+5. Deploy — you get https://roost-xxx.vercel.app
+
+Option B — Vercel CLI:
+  npm i -g vercel
+  cd C:\Users\User\Downloads\roost
+  vercel login
+  vercel --prod
+
+GitHub CLI (if installed):
+  gh repo create roost --public --source=. --remote=origin --push
