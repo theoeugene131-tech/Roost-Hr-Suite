@@ -66,6 +66,7 @@ function complianceStatus(state, period, item){
 }
 function migrateState(s){
   let changed=false;
+  if(!s.companyName){ s.companyName=''; changed=true; }
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
@@ -102,7 +103,7 @@ function seedDemo(){
     {id:uid(), name:'Femi Bello', role:'Sales Associate', stage:'Applied', appliedDate:fmt(addDays(today,-2)), notes:''},
     {id:uid(), name:'Kelechi Ude', role:'Accountant (Assistant)', stage:'Offer', appliedDate:fmt(addDays(today,-12)), notes:'Offer sent'},
   ];
-  return {employees, runs:[], compliance:{}, reviews, candidates, currentRole:'owner', viewingEmployeeId:null};
+  return {companyName:'', employees, runs:[], compliance:{}, reviews, candidates, currentRole:'owner', viewingEmployeeId:null};
 }
 
 export default function Page(){
@@ -177,7 +178,23 @@ export default function Page(){
       <header>
         <div className="brand">
           <div className="brand-mark"></div>
-          <div><h1 style={{fontFamily:'Newsreader, serif', fontSize:22, fontWeight:600, fontStyle:'italic'}}>Roost</h1><p style={{fontSize:11.5, color:'var(--muted)', marginTop:2}}>Payroll, compliance & HR for teams of 5–20</p></div>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <h1 style={{fontFamily:'Newsreader, serif', fontSize:22, fontWeight:600, fontStyle:'italic'}}>Roost</h1>
+              <span style={{fontSize:10,background:'rgba(237,238,242,0.08)',border:'1px solid var(--line)',padding:'2px 6px',borderRadius:20,color:'var(--muted)'}}>{state.companyName || '—'}</span>
+            </div>
+            <p style={{fontSize:11.5, color:'var(--muted)', marginTop:2}}>Payroll, compliance & HR for teams of 5–20</p>
+            <div style={{marginTop:8,display:'flex',gap:6,alignItems:'center'}}>
+              <input
+                placeholder="Company name — e.g. GreenField Ltd"
+                value={state.companyName||''}
+                onChange={e=>update(s=>s.companyName=e.target.value)}
+                onBlur={()=>showToast(state.companyName? `Company: ${state.companyName}` : 'Company name cleared')}
+                style={{background:'var(--bg-2)',color:'var(--paper)',border:'1px solid var(--line)',borderRadius:6,padding:'7px 10px',fontSize:12.5, minWidth:240, maxWidth:320}}
+              />
+              <span style={{fontSize:10,color:'var(--muted)'}}>shown on payslips & reports</span>
+            </div>
+          </div>
         </div>
         <div>
           <div style={{display:'flex',gap:8,alignItems:'center',paddingBottom:22, flexWrap:'wrap'}}>
