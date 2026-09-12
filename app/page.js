@@ -112,6 +112,22 @@ function migrateState(s){
       changed=true;
     });
   }
+  // upgrade weak courses (<5 modules) to robust 5-module versions
+  const robustMap={
+    'Work-Life Balance': [{title:'1. Understanding Burnout — Signals',type:'doc',duration:'20m',content:'Maslach inventory + 12 signals checklist'},{title:'2. Time & Energy Management',type:'video',duration:'30m',content:'Pomodoro, deep work (video)'},{title:'3. Recovery Toolkit',type:'doc',duration:'20m',content:'Sleep, movement, mindfulness'},{title:'4. Wellness Plan Worksheet',type:'assignment',duration:'25m',content:'Draft 7-day plan'},{title:'5. Assessment — Balance',type:'quiz',duration:'15m',content:'10 Qs, 70% pass'}],
+    'Grit & Resilience': [{title:'1. Grit Principles',type:'doc',duration:'25m',content:'Angela Duckworth framework'},{title:'2. Growth Mindset in Practice',type:'video',duration:'30m',content:'Carol Dweck cases'},{title:'3. Resilience Stories — Nigeria',type:'video',duration:'30m',content:'Local entrepreneurs'},{title:'4. Reflection Journal',type:'assignment',duration:'20m',content:'Write 300-word story'},{title:'5. Final Test — Grit',type:'quiz',duration:'15m',content:'12 Qs, 70% pass'}],
+    'Effective Communication': [{title:'1. Writing Clearly — 5 Rules',type:'doc',duration:'25m',content:'Guide + examples'},{title:'2. Active Listening Lab',type:'video',duration:'20m',content:'Mirroring demos'},{title:'3. Feedback without Friction',type:'doc',duration:'20m',content:'SBI model'},{title:'4. Practice: Feedback Lab',type:'assignment',duration:'25m',content:'Peer feedback'},{title:'5. Quiz — Communication',type:'quiz',duration:'10m',content:'10 Qs, 70% pass'}],
+    'Customer Service Excellence': [{title:'1. Service Mindset & Empathy Map',type:'doc',duration:'40m',content:'Playbook + empathy canvas'},{title:'2. Handling Complaints — HEARD',type:'video',duration:'45m',content:'HEARD technique demos'},{title:'3. Role-play: Difficult Customer',type:'assignment',duration:'30m',content:'Record 2-min voice note'},{title:'4. NPS & Follow-up',type:'doc',duration:'25m',content:'Follow-up scripts'},{title:'5. Final Test — Service',type:'quiz',duration:'20m',content:'15 Qs, 70% pass'}],
+  };
+  Object.entries(robustMap).forEach(([title,mods])=>{
+    const tr=s.trainings.find(t=>t.title===title);
+    if(tr && tr.modules.length < 5){
+      tr.modules=mods.map(m=>({id:uid(), title:m.title, type:m.type, content:m.content, duration:m.duration}));
+      tr.description = title==='Work-Life Balance'?'Stress, boundaries, burnout prevention, focus & recovery.': title==='Grit & Resilience'?'Duckworth grit, growth mindset, bouncing back from failure.': title==='Effective Communication'?'Writing, listening, feedback without friction, remote comms.':'Handling complaints, empathy and service recovery for frontline teams.';
+      tr.duration= title==='Customer Service Excellence'?'3h': title==='Work-Life Balance'?'2h': title==='Grit & Resilience'?'2h':'1.5h';
+      changed=true;
+    }
+  });
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
@@ -152,33 +168,46 @@ function seedDemo(){
     {id:uid(), name:'Kelechi Ude', role:'Accountant (Assistant)', stage:'Offer', appliedDate:fmt(addDays(today,-12)), notes:'Offer sent'},
   ];
   const trainings=[
-    {id:uid(), title:'Workplace Safety Essentials', category:'Compliance', duration:'2h', description:'Mandatory safety, hygiene and emergency procedures for all staff.', modules:[
-      {id:uid(), title:'Safety Policies & Emergency Exits', type:'doc', content:'Review safety handbook (PDF) attached', duration:'30m'},
-      {id:uid(), title:'Hygiene & Incident Reporting', type:'video', content:'Video: incident reporting demo', duration:'45m'},
-      {id:uid(), title:'Quiz — Safety', type:'quiz', content:'Pass mark 70% (3 attempts)', duration:'15m'},
+    {id:uid(), title:'Workplace Safety Essentials', category:'Compliance', duration:'2.5h', description:'HSE Act-aligned: emergency, PPE, fire, hygiene, and incident reporting. Mandatory for all staff.', objectives:'Identify hazards, follow PPE, report incidents, evacuate safely.', modules:[
+      {id:uid(), title:'1. HSE Policy & Legal Duties', type:'doc', content:'Handbook: OSHA/Nigeria Factories Act duties (PDF + checklist)', duration:'30m'},
+      {id:uid(), title:'2. PPE & Workplace Hazards', type:'video', content:'Video: PPE demo, slips/trips, electrical', duration:'25m'},
+      {id:uid(), title:'3. Fire & Emergency Evacuation', type:'video', content:'Drill walkthrough + exit mapping exercise', duration:'30m'},
+      {id:uid(), title:'4. Hygiene & Incident Reporting', type:'assignment', content:'Complete incident form sample — submit for review', duration:'25m'},
+      {id:uid(), title:'5. Final Assessment — Safety', type:'quiz', content:'20 Qs, 70% pass, 3 attempts, certificate on pass', duration:'20m'},
     ], required:true, createdAt:fmt(today)},
-    {id:uid(), title:'HR Compliance & Ethics', category:'Compliance', duration:'1.5h', description:'Code of conduct, data protection, anti-harassment.', modules:[
-      {id:uid(), title:'Code of Conduct', type:'doc', content:'Company code of conduct', duration:'30m'},
-      {id:uid(), title:'Quiz — Ethics', type:'quiz', content:'Pass mark 70%', duration:'15m'},
+    {id:uid(), title:'HR Compliance & Ethics', category:'Compliance', duration:'1.5h', description:'Code of conduct, confidentiality, anti-harassment, data protection (NDPA 2023).', objectives:'Apply code, protect data, handle grievances ethically.', modules:[
+      {id:uid(), title:'1. Code of Conduct & Conflicts', type:'doc', content:'Policy doc + scenario cards (10 cases)', duration:'30m'},
+      {id:uid(), title:'2. Confidentiality & NDPA', type:'doc', content:'Data handling guide + do/don\'ts', duration:'20m'},
+      {id:uid(), title:'3. Anti-Harassment & Grievance', type:'video', content:'Role-plays: speaking up safely', duration:'20m'},
+      {id:uid(), title:'4. Assessment — Ethics', type:'quiz', content:'15 Qs, 70% pass', duration:'15m'},
     ], required:true, createdAt:fmt(today)},
-    {id:uid(), title:'Customer Service Excellence', category:'Skills', duration:'3h', description:'Handling complaints, empathy and service recovery for frontline teams.', modules:[
-      {id:uid(), title:'Service Framework & Empathy', type:'doc', content:'Service playbook', duration:'60m'},
-      {id:uid(), title:'Role-play: Difficult Customer', type:'assignment', content:'Submit reflection note', duration:'30m'},
-      {id:uid(), title:'Quiz — Service', type:'quiz', content:'Pass 70%', duration:'15m'},
+    {id:uid(), title:'Customer Service Excellence', category:'Skills', duration:'3h', description:'Service recovery, empathy, difficult customers, NPS. For Sales & Support.', objectives:'De-escalate, empathize, close with satisfaction.', modules:[
+      {id:uid(), title:'1. Service Mindset & Empathy Map', type:'doc', content:'Playbook + empathy canvas', duration:'40m'},
+      {id:uid(), title:'2. Handling Complaints — HEARD', type:'video', content:'HEARD technique demos (5 videos)', duration:'45m'},
+      {id:uid(), title:'3. Role-play: Difficult Customer', type:'assignment', content:'Record 2-min voice note — peer review', duration:'30m'},
+      {id:uid(), title:'4. NPS & Follow-up', type:'doc', content:'Follow-up scripts + survey', duration:'25m'},
+      {id:uid(), title:'5. Final Test — Service', type:'quiz', content:'15 Qs, 70% pass', duration:'20m'},
     ], required:false, createdAt:fmt(today)},
-    {id:uid(), title:'Work-Life Balance', category:'Wellness', duration:'1.5h', description:'Managing stress, boundaries, burnout prevention and productivity.', modules:[
-      {id:uid(), title:'Understanding Burnout', type:'doc', content:'Burnout signals guide', duration:'20m'},
-      {id:uid(), title:'Time & Energy Management', type:'video', content:'Techniques video', duration:'30m'},
-      {id:uid(), title:'Self-assessment — Balance', type:'assignment', content:'Wellness plan worksheet', duration:'20m'},
+    {id:uid(), title:'Work-Life Balance', category:'Wellness', duration:'2h', description:'Stress, boundaries, burnout prevention, focus & recovery.', objectives:'Set boundaries, manage energy, build recovery routine.', modules:[
+      {id:uid(), title:'1. Understanding Burnout — Signals', type:'doc', content:'Maslach inventory + 12 signals checklist', duration:'20m'},
+      {id:uid(), title:'2. Time & Energy Management', type:'video', content:'Pomodoro, deep work, no-meeting blocks (video)', duration:'30m'},
+      {id:uid(), title:'3. Recovery Toolkit', type:'doc', content:'Sleep, movement, mindfulness micro-habits', duration:'20m'},
+      {id:uid(), title:'4. Wellness Plan Worksheet', type:'assignment', content:'Draft 7-day balance plan — manager review', duration:'25m'},
+      {id:uid(), title:'5. Assessment — Balance', type:'quiz', content:'10 Qs, 70% pass', duration:'15m'},
     ], required:false, createdAt:fmt(today)},
-    {id:uid(), title:'Grit & Resilience', category:'Mindset', duration:'2h', description:'Growth mindset, perseverance through obstacles, grit at work.', modules:[
-      {id:uid(), title:'Grit Principles', type:'doc', content:'Angela Duckworth framework', duration:'30m'},
-      {id:uid(), title:'Resilience Stories', type:'video', content:'Case studies', duration:'40m'},
-      {id:uid(), title:'Quiz — Grit', type:'quiz', content:'Pass 70%', duration:'15m'},
+    {id:uid(), title:'Grit & Resilience', category:'Mindset', duration:'2h', description:'Duckworth grit, growth mindset, bouncing back from failure.', objectives:'Reframe failure, sustain effort, build resilience.', modules:[
+      {id:uid(), title:'1. Grit Principles', type:'doc', content:'Angela Duckworth framework + self-test', duration:'25m'},
+      {id:uid(), title:'2. Growth Mindset in Practice', type:'video', content:'Carol Dweck cases — fixed vs growth', duration:'30m'},
+      {id:uid(), title:'3. Resilience Stories — Nigeria', type:'video', content:'Local entrepreneurs & grit interviews', duration:'30m'},
+      {id:uid(), title:'4. Reflection Journal', type:'assignment', content:'Write 300-word grit story', duration:'20m'},
+      {id:uid(), title:'5. Final Test — Grit', type:'quiz', content:'12 Qs, 70% pass', duration:'15m'},
     ], required:false, createdAt:fmt(today)},
-    {id:uid(), title:'Effective Communication', category:'Skills', duration:'1h', description:'Clear writing, active listening, feedback without friction.', modules:[
-      {id:uid(), title:'Communication Essentials', type:'doc', content:'Guide', duration:'30m'},
-      {id:uid(), title:'Practice: Feedback Lab', type:'assignment', content:'Peer feedback exercise', duration:'20m'},
+    {id:uid(), title:'Effective Communication', category:'Skills', duration:'1.5h', description:'Writing, listening, feedback without friction, remote comms.', objectives:'Write clearly, listen actively, give feedback well.', modules:[
+      {id:uid(), title:'1. Writing Clearly — 5 Rules', type:'doc', content:'Guide + before/after examples', duration:'25m'},
+      {id:uid(), title:'2. Active Listening Lab', type:'video', content:'Mirroring, paraphrasing demos', duration:'20m'},
+      {id:uid(), title:'3. Feedback without Friction', type:'doc', content:'SBI model + scripts', duration:'20m'},
+      {id:uid(), title:'4. Practice: Feedback Lab', type:'assignment', content:'Peer feedback — record & reflect', duration:'25m'},
+      {id:uid(), title:'5. Quiz — Communication', type:'quiz', content:'10 Qs, 70% pass', duration:'10m'},
     ], required:false, createdAt:fmt(today)},
   ];
   const enrollments=[
@@ -358,6 +387,12 @@ export default function Page(){
             {state.currentRole==='employee' && <select value={state.viewingEmployeeId||state.employees[0]?.id} onChange={e=>update(s=>s.viewingEmployeeId=e.target.value)} style={{background:'var(--bg-2)',color:'var(--paper)',border:'1px solid var(--line)',borderRadius:6,padding:'8px 10px',fontSize:12.5}}>
               {state.employees.map(emp=><option key={emp.id} value={emp.id}>{emp.name}</option>)}
             </select>}
+            <button onClick={()=>{
+              const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+              const url=URL.createObjectURL(blob);
+              const a=document.createElement('a'); a.href=url; a.download=`roost-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); showToast('Backup saved — keeps all data offline-safe');
+            }} style={{background:'#4C8577',color:'#fff',border:'none',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer',fontWeight:700}}>⬇ Save / Backup</button>
+            <label style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>⬆ Restore<input type="file" accept=".json" style={{display:'none'}} onChange={ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.employees) throw new Error('Invalid backup'); if(confirm(`Restore backup from ${j.companyName||'file'}? This will overwrite current data.`)){ const mig=migrateState(j); setState(mig); saveState(mig); showToast('Backup restored ✓'); }}catch(e){ alert('Invalid backup file'); } }; r.readAsText(f); }}/></label>
             <button onClick={()=>{ if(confirm('Reset to demo data?')){ const s=seedDemo(); setState(s); saveState(s); showToast('Demo data restored'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Reset demo</button>
           </div>
           {state.currentRole!=='employee' && <div className="stats">
