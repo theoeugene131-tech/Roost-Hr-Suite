@@ -72,6 +72,19 @@ function migrateState(s){
   if(!s.trainings){ s.trainings=[]; changed=true; }
   if(!s.enrollments){ s.enrollments=[]; changed=true; }
   if(!s.certificates){ s.certificates=[]; changed=true; }
+  // front-load additional courses if missing (customer service already, add work-life balance, grit, etc.)
+  const mustHave=[
+    {title:'Customer Service Excellence', def:{category:'Skills', duration:'3h', description:'Handling complaints, empathy and service recovery for frontline teams.', modules:[{title:'Service Framework & Empathy',type:'doc',duration:'60m'},{title:'Role-play: Difficult Customer',type:'assignment',duration:'30m'},{title:'Quiz — Service',type:'quiz',duration:'15m'}]}},
+    {title:'Work-Life Balance', def:{category:'Wellness', duration:'1.5h', description:'Managing stress, boundaries, burnout prevention and productivity.', modules:[{title:'Understanding Burnout',type:'doc',duration:'20m'},{title:'Time & Energy Management',type:'video',duration:'30m'},{title:'Self-assessment — Balance',type:'assignment',duration:'20m'}]}},
+    {title:'Grit & Resilience', def:{category:'Mindset', duration:'2h', description:'Growth mindset, perseverance through obstacles, grit at work.', modules:[{title:'Grit Principles',type:'doc',duration:'30m'},{title:'Resilience Stories',type:'video',duration:'40m'},{title:'Quiz — Grit',type:'quiz',duration:'15m'}]}},
+    {title:'Effective Communication', def:{category:'Skills', duration:'1h', description:'Clear writing, active listening, feedback without friction.', modules:[{title:'Communication Essentials',type:'doc',duration:'30m'},{title:'Practice: Feedback Lab',type:'assignment',duration:'20m'}]}},
+  ];
+  mustHave.forEach(m=>{
+    if(!s.trainings.some(t=>t.title===m.title)){
+      s.trainings.push({id:uid(), title:m.title, category:m.def.category, duration:m.def.duration, description:m.def.description, required:false, createdAt:new Date().toISOString().slice(0,10), modules: m.def.modules.map(mm=>({id:uid(), title:mm.title, type:mm.type, content:mm.type==='quiz'?'Pass 70%':mm.title, duration:mm.duration}))});
+      changed=true;
+    }
+  });
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
@@ -121,9 +134,24 @@ function seedDemo(){
       {id:uid(), title:'Code of Conduct', type:'doc', content:'Company code of conduct', duration:'30m'},
       {id:uid(), title:'Quiz — Ethics', type:'quiz', content:'Pass mark 70%', duration:'15m'},
     ], required:true, createdAt:fmt(today)},
-    {id:uid(), title:'Customer Service Excellence', category:'Skills', duration:'3h', description:'For frontline roles — handling complaints, empathy.', modules:[
-      {id:uid(), title:'Service Framework', type:'doc', content:'Service playbook', duration:'60m'},
-      {id:uid(), title:'Role-play Exercise', type:'assignment', content:'Submit reflection note', duration:'30m'},
+    {id:uid(), title:'Customer Service Excellence', category:'Skills', duration:'3h', description:'Handling complaints, empathy and service recovery for frontline teams.', modules:[
+      {id:uid(), title:'Service Framework & Empathy', type:'doc', content:'Service playbook', duration:'60m'},
+      {id:uid(), title:'Role-play: Difficult Customer', type:'assignment', content:'Submit reflection note', duration:'30m'},
+      {id:uid(), title:'Quiz — Service', type:'quiz', content:'Pass 70%', duration:'15m'},
+    ], required:false, createdAt:fmt(today)},
+    {id:uid(), title:'Work-Life Balance', category:'Wellness', duration:'1.5h', description:'Managing stress, boundaries, burnout prevention and productivity.', modules:[
+      {id:uid(), title:'Understanding Burnout', type:'doc', content:'Burnout signals guide', duration:'20m'},
+      {id:uid(), title:'Time & Energy Management', type:'video', content:'Techniques video', duration:'30m'},
+      {id:uid(), title:'Self-assessment — Balance', type:'assignment', content:'Wellness plan worksheet', duration:'20m'},
+    ], required:false, createdAt:fmt(today)},
+    {id:uid(), title:'Grit & Resilience', category:'Mindset', duration:'2h', description:'Growth mindset, perseverance through obstacles, grit at work.', modules:[
+      {id:uid(), title:'Grit Principles', type:'doc', content:'Angela Duckworth framework', duration:'30m'},
+      {id:uid(), title:'Resilience Stories', type:'video', content:'Case studies', duration:'40m'},
+      {id:uid(), title:'Quiz — Grit', type:'quiz', content:'Pass 70%', duration:'15m'},
+    ], required:false, createdAt:fmt(today)},
+    {id:uid(), title:'Effective Communication', category:'Skills', duration:'1h', description:'Clear writing, active listening, feedback without friction.', modules:[
+      {id:uid(), title:'Communication Essentials', type:'doc', content:'Guide', duration:'30m'},
+      {id:uid(), title:'Practice: Feedback Lab', type:'assignment', content:'Peer feedback exercise', duration:'20m'},
     ], required:false, createdAt:fmt(today)},
   ];
   const enrollments=[
@@ -561,13 +589,18 @@ function printCertificate({companyName, cert, employee, training}){
 }
 function Training({state,update,setModal,showToast}){
   const [tab,setTab]=useState('catalog');
-  const enrolledCount=state.enrollments.length;
-  const completedCount=state.enrollments.filter(e=>e.progress===100).length;
+  const isEmployee=state.currentRole==='employee';
+  const myId=state.viewingEmployeeId || state.employees[0]?.id;
+  const visibleEnrollments=isEmployee? state.enrollments.filter(e=>e.employeeId===myId) : state.enrollments;
+  const visibleCerts=isEmployee? state.certificates.filter(c=>c.employeeId===myId) : state.certificates;
+  const enrolledCount=visibleEnrollments.length;
+  const completedCount=visibleEnrollments.filter(e=>e.progress===100).length;
   const pendingCount=enrolledCount-completedCount;
-  const certCount=state.certificates.length;
+  const certCount=visibleCerts.length;
   return (<>
-    <div className="panel-head"><div><h2>Training Suite</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Courses + Assignments + Progress + Certificates — offline & printable</p></div>
-      <div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>setModal({type:'course'})}>+ New course</button><button className="btn" style={{background:'#fff',color:'#201526'}} onClick={()=>setModal({type:'enroll'})}>+ Enroll staff</button></div>
+    <div className="panel-head"><div><h2>Training Suite</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>{isEmployee? 'Your courses — learn offline, get certified' : 'Courses + Assignments + Progress + Certificates — offline & printable'}</p></div>
+      {!isEmployee && <div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>setModal({type:'course'})}>+ New course</button><button className="btn" style={{background:'#fff',color:'#201526'}} onClick={()=>setModal({type:'enroll'})}>+ Enroll staff</button></div>}
+      {isEmployee && <div style={{fontSize:11,color:'var(--muted)',background:'rgba(237,238,242,0.08)',padding:'6px 10px',borderRadius:20}}>Employee view — contact HR to enroll</div>}
     </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12,marginBottom:14}}>
       <div style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:12}}><div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase'}}>Courses</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{state.trainings.length}</div></div>
@@ -583,14 +616,22 @@ function Training({state,update,setModal,showToast}){
     {tab==='catalog' && <div className="grid">
       {state.trainings.map(tr=>{
         const enrolled=state.enrollments.filter(e=>e.trainingId===tr.id).length;
+        const myEnroll=state.enrollments.find(e=>e.trainingId===tr.id && e.employeeId===myId);
         return <div key={tr.id} className="card" style={{gap:10}}>
           <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:10,background:tr.required?'#E2735B':'#E0E2E8',color:tr.required?'#fff':'#201526',padding:'3px 7px',borderRadius:20}}>{tr.category} {tr.required?'· Required':''}</span><span style={{fontSize:11,opacity:0.55}}>{tr.duration}</span></div>
           <div style={{fontWeight:700,fontSize:15}}>{tr.title}</div><div style={{fontSize:12,opacity:0.7,lineHeight:1.4}}>{tr.description}</div>
           <div style={{fontSize:11,opacity:0.65}}>{tr.modules.length} modules: {tr.modules.map(m=>m.title).join(' · ')}</div>
           <div style={{display:'flex',gap:6,marginTop:4,flexWrap:'wrap'}}>
-            <button onClick={()=>setModal({type:'enroll', preset:tr.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Enroll staff ({enrolled})</button>
-            <button onClick={()=>setModal({type:'editCourse', data:tr.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Edit</button>
-            <button onClick={()=>{ if(confirm('Delete course?')) update(s=>{ s.trainings=s.trainings.filter(x=>x.id!==tr.id); s.enrollments=s.enrollments.filter(e=>e.trainingId!==tr.id); }); }} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Remove</button>
+            {isEmployee ? (
+              myEnroll? <span style={{fontSize:11,background:myEnroll.progress===100?'#4C8577':'#E2735B',color:'#fff',padding:'6px 10px',borderRadius:5}}>{myEnroll.progress===100?'Completed ✓':`${myEnroll.progress}% — Enrolled`}</span>
+              : <button onClick={()=>{ update(s=>{ s.enrollments.push({id:uid(), employeeId:myId, trainingId:tr.id, progress:0, completedModules:[], enrolledAt:new Date().toISOString().slice(0,10), completedAt:null, score:null, certificateId:null}); }); showToast('Enrolled'); }} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Enroll me</button>
+            ) : (
+              <>
+                <button onClick={()=>setModal({type:'enroll', preset:tr.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Enroll staff ({enrolled})</button>
+                <button onClick={()=>setModal({type:'editCourse', data:tr.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Edit</button>
+                <button onClick={()=>{ if(confirm('Delete course?')) update(s=>{ s.trainings=s.trainings.filter(x=>x.id!==tr.id); s.enrollments=s.enrollments.filter(e=>e.trainingId!==tr.id); }); }} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Remove</button>
+              </>
+            )}
           </div>
         </div>;
       })}
@@ -598,10 +639,10 @@ function Training({state,update,setModal,showToast}){
     </div>}
 
     {tab==='enrollments' && <div style={{background:'#EDEEF2',borderRadius:8,padding:8}}>
-      {state.enrollments.length===0? <div style={{color:'rgba(32,21,38,0.6)',textAlign:'center',padding:24}}>No enrollments yet.</div> :
+      {visibleEnrollments.length===0? <div style={{color:'rgba(32,21,38,0.6)',textAlign:'center',padding:24}}>{isEmployee?'Not enrolled yet — join a course from Catalog':'No enrollments yet.'}</div> :
       <table style={{width:'100%',borderCollapse:'collapse',color:'#201526',fontSize:12}}>
         <thead><tr style={{background:'#E0E2E8'}}><th style={{textAlign:'left',padding:'8px'}}>Staff</th><th style={{textAlign:'left',padding:'8px'}}>Course</th><th style={{textAlign:'center',padding:'8px'}}>Progress</th><th style={{textAlign:'center',padding:'8px'}}>Score</th><th style={{textAlign:'left',padding:'8px'}}>Action</th></tr></thead>
-        <tbody>{state.enrollments.map(en=>{
+        <tbody>{visibleEnrollments.map(en=>{
           const emp=state.employees.find(e=>e.id===en.employeeId);
           const tr=state.trainings.find(t=>t.id===en.trainingId);
           return <tr key={en.id} style={{borderBottom:'1px solid rgba(32,21,38,0.07)'}}>
@@ -628,7 +669,8 @@ function Training({state,update,setModal,showToast}){
                 showToast(next.title+' completed');
               }} style={{fontSize:11,background:'#201526',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Complete next</button>}
               {en.progress===100 && <button onClick={()=>{ const cert=state.certificates.find(c=>c.id===en.certificateId); const emp2=state.employees.find(e=>e.id===en.employeeId); const tr2=state.trainings.find(t=>t.id===en.trainingId); if(cert&&emp2&&tr2) printCertificate({companyName:state.companyName, cert, employee:emp2, training:tr2}); }} style={{fontSize:11,background:'#4C8577',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Certificate</button>}
-              <button onClick={()=>{ if(confirm('Unenroll?')) update(s=>{ s.enrollments=s.enrollments.filter(x=>x.id!==en.id); s.certificates=s.certificates.filter(c=>c.id!==en.certificateId); }); }} style={{fontSize:11,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>
+              {!isEmployee && <button onClick={()=>{ if(confirm('Unenroll?')) update(s=>{ s.enrollments=s.enrollments.filter(x=>x.id!==en.id); s.certificates=s.certificates.filter(c=>c.id!==en.certificateId); }); }} style={{fontSize:11,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>}
+              {isEmployee && en.employeeId===myId && en.progress<100 && <span style={{fontSize:10,opacity:0.55}}>HR unenrolls</span>}
             </td>
           </tr>;
         })}</tbody>
@@ -636,7 +678,7 @@ function Training({state,update,setModal,showToast}){
     </div>}
 
     {tab==='certificates' && <div className="grid">
-      {state.certificates.map(c=>{
+      {visibleCerts.map(c=>{
         const emp=state.employees.find(e=>e.id===c.employeeId);
         const tr=state.trainings.find(t=>t.id===c.trainingId);
         return <div key={c.id} style={{background:'#fff',color:'#201526',borderRadius:8,padding:16,border:'2px solid #EDEEF2'}}>
@@ -647,7 +689,7 @@ function Training({state,update,setModal,showToast}){
           <button onClick={()=>printCertificate({companyName:state.companyName, cert:c, employee:emp, training:tr})} style={{marginTop:10,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Print / Save PDF</button>
         </div>;
       })}
-      {state.certificates.length===0 && <div style={{color:'var(--muted)',padding:20}}>No certificates yet — complete a training to generate.</div>}
+      {visibleCerts.length===0 && <div style={{color:'var(--muted)',padding:20}}>{isEmployee?'Complete a course to earn your certificate':'No certificates yet — complete a training to generate.'}</div>}
     </div>}
   </>);
 }
