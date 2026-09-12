@@ -22,14 +22,20 @@ const DOC_TYPES = [
   {key:'annual', label:'Annual Appraisal', category:'Appraisals', required:false},
 ];
 const TAB_LABELS = {
-  overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', training:'Training', runpayroll:'Run payroll', history:'History',
+  overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', training:'Training', leave:'Leave', attendance:'Attendance', org:'Org Chart', runpayroll:'Run payroll', history:'History',
   compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile'
 };
 function visibleTabs(role){
-  if(role==='employee') return ['myprofile','training'];
-  if(role==='admin') return ['overview','team','docs','regulatory','training','runpayroll','history','compliance','reviews','hiring'];
-  return ['overview','team','docs','regulatory','training','runpayroll','history','compliance','reviews','hiring','reports'];
+  if(role==='employee') return ['myprofile','training','leave','attendance'];
+  if(role==='admin') return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring'];
+  return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','reports'];
 }
+const LEAVE_TYPES = [
+  {key:'annual', label:'Annual Leave', days:21, color:'#4C8577'},
+  {key:'sick', label:'Sick Leave', days:10, color:'#E2735B'},
+  {key:'casual', label:'Casual Leave', days:7, color:'#C9A227'},
+  {key:'maternity', label:'Maternity/Paternity', days:84, color:'#7D6BA6'},
+];
 function initials(name){ return name.trim().split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase(); }
 function money(n){ return '₦' + Math.round(n).toLocaleString('en-NG'); }
 function uid(){ return Math.random().toString(36).slice(2,9); }
@@ -72,6 +78,16 @@ function migrateState(s){
   if(!s.trainings){ s.trainings=[]; changed=true; }
   if(!s.enrollments){ s.enrollments=[]; changed=true; }
   if(!s.certificates){ s.certificates=[]; changed=true; }
+  if(!s.leaves){ s.leaves=[]; changed=true; }
+  if(!s.attendance){ s.attendance=[]; changed=true; }
+  if(!s.orgUnits){ s.orgUnits=[
+    {id:'dept1', name:'Operations', head: s.employees[0]?.id||null, color:'#4C8577'},
+    {id:'dept2', name:'Sales & Support', head: s.employees[1]?.id||null, color:'#E2735B'},
+    {id:'dept3', name:'Finance', head: s.employees[2]?.id||null, color:'#C9A227'},
+  ]; changed=true; }
+  s.employees.forEach(em=>{
+    if(em.department===undefined){ em.department = s.orgUnits[Math.floor(Math.random()*s.orgUnits.length)]?.id || 'dept1'; changed=true; }
+  });
   // front-load additional courses if missing (customer service already, add work-life balance, grit, etc.)
   const mustHave=[
     {title:'Customer Service Excellence', def:{category:'Skills', duration:'3h', description:'Handling complaints, empathy and service recovery for frontline teams.', modules:[{title:'Service Framework & Empathy',type:'doc',duration:'60m'},{title:'Role-play: Difficult Customer',type:'assignment',duration:'30m'},{title:'Quiz — Service',type:'quiz',duration:'15m'}]}},
@@ -159,7 +175,23 @@ function seedDemo(){
     {id:uid(), employeeId:employees[0].id, trainingId: trainings[1].id, progress:100, completedModules: trainings[1].modules.map(m=>m.id), enrolledAt:fmt(addDays(today,-20)), completedAt:fmt(addDays(today,-5)), score:85, certificateId: uid()},
   ];
   const certificates=enrollments.filter(e=>e.certificateId).map(e=>({id:e.certificateId, employeeId:e.employeeId, trainingId:e.trainingId, issuedAt:e.completedAt, score:e.score}));
-  return {companyName:'', employees, runs:[], compliance:{}, reviews, candidates, trainings, enrollments, certificates, currentRole:'owner', viewingEmployeeId:null};
+  const leaves=[
+    {id:uid(), employeeId:employees[0].id, type:'annual', from:fmt(addDays(today,5)), to:fmt(addDays(today,9)), days:5, reason:'Family event', status:'approved', createdAt:fmt(addDays(today,-2))},
+    {id:uid(), employeeId:employees[1].id, type:'sick', from:fmt(addDays(today,1)), to:fmt(addDays(today,2)), days:2, reason:'Medical', status:'pending', createdAt:fmt(today)},
+  ];
+  const attendance=[
+    {id:uid(), employeeId:employees[0].id, date:fmt(today), clockIn:'08:12', clockOut:'17:05', status:'present'},
+    {id:uid(), employeeId:employees[1].id, date:fmt(today), clockIn:'08:45', clockOut:null, status:'present'},
+    {id:uid(), employeeId:employees[3].id, date:fmt(today), clockIn:null, clockOut:null, status:'absent'},
+  ];
+  const orgUnits=[
+    {id:'dept1', name:'Operations', head:employees[0].id, color:'#4C8577'},
+    {id:'dept2', name:'Sales & Support', head:employees[1].id, color:'#E2735B'},
+    {id:'dept3', name:'Finance', head:employees[2].id, color:'#C9A227'},
+    {id:'dept4', name:'Warehouse', head:employees[3].id, color:'#7D6BA6'},
+  ];
+  employees.forEach((e,i)=> e.department = orgUnits[i%orgUnits.length].id);
+  return {companyName:'', employees, runs:[], compliance:{}, reviews, candidates, trainings, enrollments, certificates, leaves, attendance, orgUnits, currentRole:'owner', viewingEmployeeId:null};
 }
 
 export default function Page(){
@@ -336,6 +368,9 @@ export default function Page(){
         {currentTab==='docs' && <Documents state={state} update={update} setModal={setModal} showToast={showToast} docFilter={docFilter} setDocFilter={setDocFilter} />}
         {currentTab==='regulatory' && <Regulatory state={state} update={update} />}
         {currentTab==='training' && <Training state={state} update={update} setModal={setModal} showToast={showToast} />}
+        {currentTab==='leave' && <Leave state={state} update={update} setModal={setModal} showToast={showToast} />}
+        {currentTab==='attendance' && <Attendance state={state} update={update} setModal={setModal} showToast={showToast} />}
+        {currentTab==='org' && <Org state={state} update={update} setModal={setModal} showToast={showToast} />}
         {currentTab==='runpayroll' && <RunPayroll state={state} update={update} setCurrentTab={setCurrentTab} showToast={showToast} />}
         {currentTab==='history' && <History state={state} expandedRun={expandedRun} setExpandedRun={setExpandedRun} />}
         {currentTab==='compliance' && <Compliance state={state} update={update} />}
@@ -693,6 +728,117 @@ function Training({state,update,setModal,showToast}){
     </div>}
   </>);
 }
+function Leave({state,update,setModal,showToast}){
+  const isEmployee=state.currentRole==='employee';
+  const myId=state.viewingEmployeeId||state.employees[0]?.id;
+  const leaves=isEmployee? state.leaves.filter(l=>l.employeeId===myId) : state.leaves;
+  function balance(empId, type){
+    const taken=state.leaves.filter(l=>l.employeeId===empId && l.type===type && l.status==='approved').reduce((s,l)=>s+l.days,0);
+    const quota=LEAVE_TYPES.find(t=>t.key===type).days;
+    return quota - taken;
+  }
+  return (<>
+    <div className="panel-head"><div><h2>Leave Management</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>{isEmployee?'Your leave requests & balances':'Team leave — request, approve, track balances'}</p></div><button className="btn btn-primary" onClick={()=>setModal({type:'leave'})}>+ Request leave</button></div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:14}}>
+      {LEAVE_TYPES.map(t=>{
+        const bal=isEmployee? balance(myId,t.key) : null;
+        return <div key={t.key} style={{background:'var(--bg-2)',borderLeft:`4px solid ${t.color}`,borderRadius:8,padding:12}}>
+          <div style={{fontSize:11,fontWeight:600}}>{t.label}</div><div style={{fontSize:11,opacity:0.6}}>{t.days} days/year</div>{isEmployee && <div style={{fontFamily:'IBM Plex Mono',fontSize:13,marginTop:4, color: bal<5?'#E2735B':'#fff'}}>Remaining: {bal}d</div>}
+        </div>;
+      })}
+    </div>
+    {!isEmployee && <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10,marginBottom:12}}>
+      {state.employees.filter(e=>e.active).map(e=>(
+        <div key={e.id} style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:10}}>
+          <div style={{fontSize:12,fontWeight:700}}>{e.name}</div><div style={{fontSize:10,opacity:0.6}}>{LEAVE_TYPES.map(t=> `${t.label.split(' ')[0]}:${balance(e.id,t.key)}d`).join(' · ')}</div>
+        </div>
+      ))}
+    </div>}
+    <div style={{background:'#EDEEF2',borderRadius:8,overflow:'hidden'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',color:'#201526',fontSize:12}}>
+        <thead><tr style={{background:'#E0E2E8'}}><th style={{textAlign:'left',padding:'8px'}}>Staff</th><th style={{padding:'8px'}}>Type</th><th style={{padding:'8px'}}>Dates</th><th style={{padding:'8px'}}>Days</th><th style={{padding:'8px'}}>Status</th><th style={{padding:'8px'}}>Action</th></tr></thead>
+        <tbody>{leaves.length===0? <tr><td colSpan={6} style={{textAlign:'center',padding:20,opacity:0.6}}>No leave requests</td></tr> :
+          leaves.slice().reverse().map(l=>{
+            const emp=state.employees.find(e=>e.id===l.employeeId);
+            const lt=LEAVE_TYPES.find(t=>t.key===l.type);
+            return <tr key={l.id} style={{borderBottom:'1px solid rgba(32,21,38,0.08)'}}><td style={{padding:'8px',fontWeight:600}}>{emp?emp.name:'—'}</td><td style={{padding:'8px'}}><span style={{background:lt.color,color:'#fff',padding:'3px 7px',borderRadius:10,fontSize:11}}>{lt.label}</span></td><td style={{padding:'8px',fontFamily:'monospace'}}>{l.from} → {l.to}</td><td style={{padding:'8px',textAlign:'center'}}>{l.days}</td><td style={{padding:'8px'}}><span style={{padding:'3px 7px',borderRadius:10,fontSize:11,background:l.status==='approved'?'#4C8577':l.status==='rejected'?'#E2735B':'#C9A227',color:'#fff'}}>{l.status}</span></td><td style={{padding:'8px',display:'flex',gap:6}}>
+              {!isEmployee && l.status==='pending' && <><button onClick={()=>update(s=>{ s.leaves.find(x=>x.id===l.id).status='approved'; })} style={{background:'#4C8577',color:'#fff',border:'none',padding:'4px 8px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Approve</button><button onClick={()=>update(s=>{ s.leaves.find(x=>x.id===l.id).status='rejected'; })} style={{background:'#E2735B',color:'#fff',border:'none',padding:'4px 8px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Reject</button></>}
+              {(isEmployee|| l.employeeId===myId) && l.status==='pending' && <button onClick={()=>{ if(confirm('Cancel request?')) update(s=> s.leaves=s.leaves.filter(x=>x.id!==l.id));}} style={{background:'transparent',border:'1px solid rgba(32,21,38,0.2)',padding:'4px 8px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Cancel</button>}
+            </td></tr>;
+          })}
+        </tbody>
+      </table>
+    </div>
+  </>);
+}
+function Attendance({state,update,setModal,showToast}){
+  const isEmployee=state.currentRole==='employee';
+  const myId=state.viewingEmployeeId||state.employees[0]?.id;
+  const todayStr=new Date().toISOString().slice(0,10);
+  const todayRec=state.attendance.find(a=>a.employeeId===myId && a.date===todayStr);
+  const list=isEmployee? state.attendance.filter(a=>a.employeeId===myId) : state.attendance;
+  function clock(type){
+    const now=new Date(); const hh=String(now.getHours()).padStart(2,'0'); const mm=String(now.getMinutes()).padStart(2,'0');
+    const time=`${hh}:${mm}`;
+    update(s=>{
+      let rec=s.attendance.find(a=>a.employeeId===myId && a.date===todayStr);
+      if(!rec){ rec={id:uid(), employeeId:myId, date:todayStr, clockIn:null, clockOut:null, status:'present'}; s.attendance.push(rec); }
+      if(type==='in'){ if(rec.clockIn) return; rec.clockIn=time; const late = hh>='09' && !(hh==='08' && mm<='30') ? true : parseInt(hh)>8; if(late && !rec.status.includes('late')) rec.status='late'; }
+      if(type==='out'){ if(!rec.clockIn){ showToast('Clock in first'); return; } rec.clockOut=time; }
+    });
+  }
+  const presentToday=state.attendance.filter(a=>a.date===todayStr && a.status!=='absent').length;
+  return (<>
+    <div className="panel-head"><div><h2>Time & Attendance</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Clock in/out, late & absent tracking — offline</p></div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>clock('in')} disabled={!!todayRec?.clockIn} style={{opacity: todayRec?.clockIn?0.5:1}}>Clock In {todayRec?.clockIn||''}</button><button className="btn" style={{background:'#EDEEF2',color:'#201526',opacity: todayRec?.clockOut?0.5:1}} onClick={()=>clock('out')} disabled={!!todayRec?.clockOut}>Clock Out {todayRec?.clockOut||''}</button><button className="btn" style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)'}} onClick={()=>setModal({type:'attendance'})}>+ Manual entry</button></div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:12}}>
+      <div style={{background:'var(--bg-2)',borderRadius:8,padding:12,border:'1px solid var(--line)'}}><div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase'}}>Today present</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{presentToday}/{state.employees.filter(e=>e.active).length}</div><div style={{fontSize:11,opacity:0.6}}>{todayStr}</div></div>
+      <div style={{background: todayRec?.status==='late'?'#C9A227':'#4C8577',color:'#fff',borderRadius:8,padding:12}}><div style={{fontSize:10,textTransform:'uppercase',opacity:0.9}}>My status today</div><div style={{fontWeight:700,marginTop:4}}>{todayRec? (todayRec.clockIn? (todayRec.status + ' · '+todayRec.clockIn+(todayRec.clockOut?' → '+todayRec.clockOut:'')) : 'Not clocked') : 'Not clocked'}</div></div>
+    </div>
+    <div style={{background:'#EDEEF2',borderRadius:8,overflow:'auto',maxHeight:380}}>
+      <table style={{width:'100%',borderCollapse:'collapse',color:'#201526',fontSize:12, minWidth:600}}>
+        <thead><tr style={{background:'#E0E2E8',position:'sticky',top:0}}><th style={{textAlign:'left',padding:'8px'}}>Date</th><th style={{textAlign:'left',padding:'8px'}}>Staff</th><th style={{padding:'8px'}}>Clock In</th><th style={{padding:'8px'}}>Clock Out</th><th style={{padding:'8px'}}>Status</th><th style={{padding:'8px'}}>Hours</th></tr></thead>
+        <tbody>{list.slice().sort((a,b)=> b.date.localeCompare(a.date)).slice(0,60).map(a=>{
+          const emp=state.employees.find(e=>e.id===a.employeeId);
+          const hours=a.clockIn && a.clockOut ? ((parseInt(a.clockOut.split(':')[0])*60+parseInt(a.clockOut.split(':')[1]) - (parseInt(a.clockIn.split(':')[0])*60+parseInt(a.clockIn.split(':')[1])))/60).toFixed(1)+'h' : '—';
+          return <tr key={a.id} style={{borderBottom:'1px solid rgba(32,21,38,0.07)'}}><td style={{padding:'8px',fontFamily:'monospace'}}>{a.date}</td><td style={{padding:'8px',fontWeight:600}}>{emp?emp.name:'—'}</td><td style={{padding:'8px',textAlign:'center'}}>{a.clockIn||'—'}</td><td style={{padding:'8px',textAlign:'center'}}>{a.clockOut||'—'}</td><td style={{padding:'8px'}}><span style={{padding:'3px 7px',borderRadius:10,fontSize:11, background: a.status==='present'?'#4C8577':a.status==='late'?'#C9A227':'#E2735B', color:'#fff'}}>{a.status}</span></td><td style={{padding:'8px',textAlign:'center',fontFamily:'monospace'}}>{hours}</td></tr>;
+        })}</tbody>
+      </table>
+    </div>
+  </>);
+}
+function Org({state,update,setModal,showToast}){
+  return (<>
+    <div className="panel-head"><div><h2>Org Management</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Departments, reporting lines, heads — drag staff between units</p></div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>setModal({type:'orgUnit'})}>+ New department</button><button className="btn" style={{background:'#fff',color:'#201526'}} onClick={()=>setModal({type:'assignDept'})}>Assign staff</button></div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:14}}>
+      {state.orgUnits.map(dept=>{
+        const head=state.employees.find(e=>e.id===dept.head);
+        const members=state.employees.filter(e=>e.department===dept.id);
+        return <div key={dept.id} style={{background:'#EDEEF2',color:'#201526',borderRadius:8,padding:16,borderLeft:`6px solid ${dept.color}`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><h3 style={{fontWeight:700}}>{dept.name}</h3><span style={{fontSize:11,background:dept.color,color:'#fff',padding:'3px 7px',borderRadius:10}}>{members.length} staff</span></div>
+          <div style={{fontSize:12,opacity:0.6,marginTop:4}}>Head: {head?head.name:'— Vacant'} · <a onClick={()=>setModal({type:'orgUnit', data:dept.id})} style={{color:'#4C8577',cursor:'pointer',textDecoration:'underline'}}>Edit</a></div>
+          <div style={{marginTop:10, display:'flex',flexDirection:'column',gap:6}}>
+            {members.map(m=> <div key={m.id} style={{display:'flex',alignItems:'center',gap:8,background:'#fff',padding:'8px 10px',borderRadius:6,fontSize:12}}>
+              <div style={{width:28,height:28,borderRadius:'50%',overflow:'hidden',background:m.color,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11}}>{m.passportPhoto? <img src={m.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(m.name)}</div>
+              <div style={{flex:1}}><div style={{fontWeight:600}}>{m.name}</div><div style={{fontSize:10,opacity:0.6}}>{m.role}</div></div>
+              <select value={m.department} onChange={e=>update(s=>{ s.employees.find(x=>x.id===m.id).department=e.target.value; })} style={{fontSize:11,padding:4,borderRadius:4,border:'1px solid #ddd',background:'#fff'}}>
+                {state.orgUnits.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>)}
+            {members.length===0 && <div style={{fontSize:12,opacity:0.5,padding:8}}>No staff in this unit.</div>}
+          </div>
+          <button onClick={()=>{ if(confirm('Delete department? Staff will move to first unit.')) update(s=>{ const fallback=s.orgUnits.find(u=>u.id!==dept.id)?.id; s.employees.filter(e=>e.department===dept.id).forEach(e=> e.department=fallback); s.orgUnits=s.orgUnits.filter(u=>u.id!==dept.id); }); }} style={{marginTop:10,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'5px 10px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Delete unit</button>
+        </div>;
+      })}
+    </div>
+    <div style={{marginTop:14,background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:12}}>
+      <div style={{fontSize:11,opacity:0.7}}>Org chart is offline — head, units and assignments saved locally. Use Assign staff to bulk move.</div>
+    </div>
+  </>);
+}
 function RunPayroll({state,update,setCurrentTab,showToast}){
   const period=nextPeriod(state.runs);
   const active=state.employees.filter(e=>e.active);
@@ -845,6 +991,10 @@ function Modal({modal,setModal,state,update,showToast}){
     if(modal.type==='course') return {title:'',category:'Compliance',duration:'2h',description:'',required:true};
     if(modal.type==='editCourse'){ const tr=state.trainings.find(x=>x.id===modal.data); return {title:tr.title,category:tr.category,duration:tr.duration,description:tr.description,required:tr.required}; }
     if(modal.type==='enroll') return {employeeId: state.employees.filter(e=>e.active)[0]?.id||'', trainingId: modal.preset|| state.trainings[0]?.id||''};
+    if(modal.type==='leave') return {employeeId: state.employees.filter(e=>e.active)[0]?.id||'', type:'annual', from:'', to:'', reason:''};
+    if(modal.type==='attendance') return {employeeId: state.employees.filter(e=>e.active)[0]?.id||'', date:new Date().toISOString().slice(0,10), clockIn:'08:00', clockOut:'', status:'present'};
+    if(modal.type==='orgUnit'){ if(modal.data){ const u=state.orgUnits.find(x=>x.id===modal.data); return {name:u.name, head:u.head||'', color:u.color}; } return {name:'', head:'', color:'#4C8577'}; }
+    if(modal.type==='assignDept') return {employeeId: state.employees[0]?.id||'', dept: state.orgUnits[0]?.id||''};
     return {};
   });
   const [ids,setIds]=useState(()=>{ if(modal.type==='staffDocs'){ const e=state.employees.find(x=>x.id===modal.data); return {nin:e.nin||'',payeTin:e.payeTin||'',nhfNumber:e.nhfNumber||'',pensionPin:e.pensionPin||'',nsitfNumber:e.nsitfNumber||''}; } return {}; });
@@ -934,7 +1084,7 @@ function Modal({modal,setModal,state,update,showToast}){
     <div className="overlay" onClick={e=>{if(e.target.classList.contains('overlay')) close();}}>
       <div className="modal">
         <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}><h3 style={{fontFamily:'Newsreader',fontSize:20,fontWeight:600}}>
-          {modal.type==='employee' ? (modal.data?'Edit teammate':'Add teammate') : modal.type==='review' ? 'Add review' : modal.type==='candidate' ? 'Add candidate' : modal.type==='course' ? 'New course' : modal.type==='editCourse' ? 'Edit course' : modal.type==='enroll' ? 'Enroll staff' : ''}
+          {modal.type==='employee' ? (modal.data?'Edit teammate':'Add teammate') : modal.type==='review' ? 'Add review' : modal.type==='candidate' ? 'Add candidate' : modal.type==='course' ? 'New course' : modal.type==='editCourse' ? 'Edit course' : modal.type==='enroll' ? 'Enroll staff' : modal.type==='leave' ? 'Request leave' : modal.type==='attendance' ? 'Manual attendance' : modal.type==='orgUnit' ? (modal.data?'Edit department':'New department') : modal.type==='assignDept' ? 'Assign staff to department' : ''}
         </h3><button onClick={close} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,opacity:0.55}}>✕</button></div>
 
         {modal.type==='employee' && <>
@@ -993,6 +1143,53 @@ function Modal({modal,setModal,state,update,showToast}){
             update(s=>{ s.enrollments.push({id:uid(), employeeId:form.employeeId, trainingId:form.trainingId, progress:0, completedModules:[], enrolledAt:new Date().toISOString().slice(0,10), completedAt:null, score:null, certificateId:null}); });
             showToast('Enrolled — progress tracked'); close();
           }}>Enroll</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
+        </>}
+        {modal.type==='leave' && <>
+          <div className="field"><label>Staff</label><select value={form.employeeId||state.employees.filter(e=>e.active)[0]?.id} onChange={e=>setForm({...form,employeeId:e.target.value})} disabled={state.currentRole==='employee'}>{state.employees.filter(e=>e.active).map(e=> <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div className="field"><label>Leave type</label><select value={form.type||'annual'} onChange={e=>setForm({...form,type:e.target.value})}>{LEAVE_TYPES.map(t=> <option key={t.key} value={t.key}>{t.label} ({t.days}d/year)</option>)}</select></div>
+          <div className="field-row"><div className="field"><label>From</label><input type="date" value={form.from||''} onChange={e=>setForm({...form,from:e.target.value})}/></div><div className="field"><label>To</label><input type="date" value={form.to||''} onChange={e=>setForm({...form,to:e.target.value})}/></div></div>
+          <div className="field"><label>Reason</label><input value={form.reason||''} onChange={e=>setForm({...form,reason:e.target.value})} placeholder="Reason for leave"/></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+            const empId = state.currentRole==='employee'? (state.viewingEmployeeId||state.employees[0]?.id) : (form.employeeId||state.employees[0]?.id);
+            if(!form.from || !form.to){ alert('Select dates'); return; }
+            const d1=new Date(form.from), d2=new Date(form.to); const days=Math.max(1, Math.round((d2-d1)/86400000)+1);
+            if(days<=0){ alert('Invalid dates'); return; }
+            update(s=>{ s.leaves.push({id:uid(), employeeId:empId, type:form.type||'annual', from:form.from, to:form.to, days, reason:form.reason||'', status:'pending', createdAt:new Date().toISOString().slice(0,10)}); });
+            showToast('Leave request sent — pending approval'); close();
+          }}>Submit request</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
+        </>}
+        {modal.type==='attendance' && <>
+          <div className="field"><label>Staff</label><select value={form.employeeId||state.employees.filter(e=>e.active)[0]?.id} onChange={e=>setForm({...form,employeeId:e.target.value})}>{state.employees.filter(e=>e.active).map(e=> <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div className="field"><label>Date</label><input type="date" value={form.date||new Date().toISOString().slice(0,10)} onChange={e=>setForm({...form,date:e.target.value})}/></div>
+          <div className="field-row"><div className="field"><label>Clock In</label><input type="time" value={form.clockIn||''} onChange={e=>setForm({...form,clockIn:e.target.value})}/></div><div className="field"><label>Clock Out</label><input type="time" value={form.clockOut||''} onChange={e=>setForm({...form,clockOut:e.target.value})}/></div></div>
+          <div className="field"><label>Status</label><select value={form.status||'present'} onChange={e=>setForm({...form,status:e.target.value})}><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+            const empId=form.employeeId||state.employees[0]?.id;
+            const date=form.date||new Date().toISOString().slice(0,10);
+            if(state.attendance.some(a=>a.employeeId===empId && a.date===date)){ alert('Record exists for this date — edit via table'); return; }
+            update(s=>{ s.attendance.push({id:uid(), employeeId:empId, date, clockIn:form.clockIn||null, clockOut:form.clockOut||null, status:form.status||'present'}); });
+            showToast('Attendance saved'); close();
+          }}>Save</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
+        </>}
+        {modal.type==='orgUnit' && <>
+          <div className="field"><label>Department name *</label><input value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. Marketing"/></div>
+          <div className="field"><label>Head</label><select value={form.head||''} onChange={e=>setForm({...form,head:e.target.value})}><option value="">— Vacant —</option>{state.employees.filter(e=>e.active).map(e=> <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div className="field"><label>Color</label><input type="color" value={form.color||'#4C8577'} onChange={e=>setForm({...form,color:e.target.value})} style={{height:40,padding:2}}/></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}>
+            <button className="btn btn-primary" onClick={()=>{
+              if(!form.name){ alert('Name required'); return; }
+              if(modal.data){ update(s=>{ const u=s.orgUnits.find(x=>x.id===modal.data); Object.assign(u,{name:form.name,head:form.head||null,color:form.color||'#4C8577'}); }); showToast('Department updated'); }
+              else { update(s=>{ s.orgUnits.push({id:'dept'+uid(), name:form.name, head:form.head||null, color:form.color||'#4C8577'}); }); showToast('Department created'); }
+              close();
+            }}>{modal.data?'Save':'Create'}</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button>
+          </div>
+        </>}
+        {modal.type==='assignDept' && <>
+          <div className="field"><label>Staff</label><select value={form.employeeId||state.employees[0]?.id} onChange={e=>setForm({...form,employeeId:e.target.value})}>{state.employees.map(e=> <option key={e.id} value={e.id}>{e.name} — {state.orgUnits.find(u=>u.id===e.department)?.name||'—'}</option>)}</select></div>
+          <div className="field"><label>Move to department</label><select value={form.dept||state.orgUnits[0]?.id} onChange={e=>setForm({...form,dept:e.target.value})}>{state.orgUnits.map(u=> <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+            update(s=>{ s.employees.find(e=>e.id===form.employeeId).department=form.dept; }); showToast('Assigned'); close();
+          }}>Assign</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
         </>}
 
       </div>
