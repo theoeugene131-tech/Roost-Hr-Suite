@@ -984,6 +984,56 @@ function MyProfile({state}){
   </>);
 }
 
+function CourseView({tr, state, update, showToast, close}){
+  const isEmployee=state.currentRole==='employee';
+  const myId=state.viewingEmployeeId||state.employees[0]?.id;
+  const [answers,setAnswers]=useState({});
+  const [showResult,setShowResult]=useState(null);
+  const quizQuestions=[
+    {q:'What is the primary goal of this training?', a:['Compliance','Entertainment','None'], correct:0},
+    {q:'Pass mark for the test is?', a:['50%','70%','90%'], correct:1},
+    {q:'Who should report an incident?', a:['Only manager','Everyone','No one'], correct:1},
+  ];
+  function submitQuiz(){
+    let score=0; quizQuestions.forEach((qq,i)=>{ if(answers[i]===qq.correct) score++; });
+    const pct=Math.round(100*score/quizQuestions.length);
+    const pass=pct>=70;
+    setShowResult({score:pct, pass});
+    if(pass){
+      update(s=>{
+        let my=s.enrollments.find(e=>e.employeeId===myId && e.trainingId===tr.id);
+        if(!my){ my={id:uid(), employeeId:myId, trainingId:tr.id, progress:0, completedModules:[], enrolledAt:new Date().toISOString().slice(0,10), completedAt:null, score:null, certificateId:null}; s.enrollments.push(my); }
+        const quizMod=tr.modules.find(m=>m.type==='quiz');
+        if(quizMod && !my.completedModules.includes(quizMod.id)) my.completedModules.push(quizMod.id);
+        tr.modules.filter(m=>m.type!=='quiz').forEach(m=>{ if(!my.completedModules.includes(m.id)) my.completedModules.push(m.id); });
+        my.progress=Math.round(100*my.completedModules.length/tr.modules.length);
+        my.score=pct;
+        if(my.progress===100 && !my.certificateId){ const cid=uid(); my.certificateId=cid; my.completedAt=new Date().toISOString().slice(0,10); s.certificates.push({id:cid, employeeId:myId, trainingId:tr.id, issuedAt:my.completedAt, score:pct}); }
+      });
+    }
+  }
+  return <>
+    <div style={{background:'rgba(32,21,38,0.05)',borderRadius:8,padding:12,marginBottom:12}}><div style={{fontSize:11,opacity:0.6}}>{tr.category} · {tr.duration} · {tr.required?'Required':''}</div><div style={{fontWeight:700,marginTop:4}}>{tr.title}</div><div style={{fontSize:12,opacity:0.7,marginTop:4}}>{tr.description}</div></div>
+    <div style={{fontSize:11,fontWeight:600,letterSpacing:0.05+'em',textTransform:'uppercase',opacity:0.6,marginBottom:6}}>Modules — Staff & HR can view & take tests</div>
+    {tr.modules.map((m,i)=> <div key={m.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#fff',border:'1px solid rgba(32,21,38,0.08)',borderRadius:6,marginBottom:6}}>
+      <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{i+1}. {m.title} <span style={{fontSize:10,background:m.type==='quiz'?'#E2735B':'#E0E2E8',color:m.type==='quiz'?'#fff':'#201526',padding:'2px 6px',borderRadius:10}}>{m.type}</span></div><div style={{fontSize:11,opacity:0.6}}>{m.duration} · {m.content}</div></div>
+      {m.type==='quiz' ? <button onClick={()=>{ setShowResult(null); setAnswers({}); document.getElementById('quiz-area')?.scrollIntoView({behavior:'smooth'}); }} style={{background:'#4C8577',color:'#fff',border:'none',padding:'6px 10px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Take Test</button> : <span style={{fontSize:11,background:'#EDEEF2',padding:'4px 8px',borderRadius:5}}>View</span>}
+    </div>)}
+    <div id="quiz-area" style={{marginTop:14,background:'#fff',border:'1px solid #ddd',borderRadius:8,padding:14}}>
+      <div style={{fontWeight:700,fontSize:13}}>Test — {tr.title} (70% to pass)</div>
+      {showResult ? <div style={{textAlign:'center',padding:16}}><div style={{fontSize:22,fontWeight:700,color: showResult.pass?'#4C8577':'#E2735B'}}>{showResult.pass?'Passed ✓':'Failed'}</div><div style={{fontFamily:'monospace',fontSize:18,marginTop:6}}>{showResult.score}%</div><div style={{fontSize:11,opacity:0.6,marginTop:4}}>{showResult.pass?'Certificate generated in Training → Certificates':'Try again — review modules'}</div><button onClick={()=>setShowResult(null)} style={{marginTop:10,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Retake</button></div> :
+      <div>
+        {quizQuestions.map((qq,i)=> <div key={i} style={{marginTop:10,padding:10,background:'rgba(32,21,38,0.04)',borderRadius:6}}>
+          <div style={{fontSize:12,fontWeight:600}}>{i+1}. {qq.q}</div>
+          <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>{qq.a.map((opt,oi)=> <label key={oi} style={{fontSize:11,background: answers[i]===oi?'#201526':'#fff',color:answers[i]===oi?'#fff':'#201526',border:'1px solid #ddd',padding:'5px 10px',borderRadius:20,cursor:'pointer'}}><input type="radio" name={`q${i}`} checked={answers[i]===oi} onChange={()=>setAnswers({...answers,[i]:oi})} style={{display:'none'}}/>{opt}</label>)}</div>
+        </div>)}
+        <button onClick={submitQuiz} style={{marginTop:12,background:'#E2735B',color:'#fff',border:'none',padding:'8px 14px',borderRadius:6,fontSize:12,cursor:'pointer',width:'100%'}}>Submit Test</button>
+        <div style={{fontSize:10,opacity:0.55,marginTop:6}}>Both Staff and HR/Admin can take this test — same questions, offline scored, progress saved.</div>
+      </div>}
+    </div>
+    <div style={{marginTop:12,textAlign:'right'}}><button onClick={close} style={{background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Close</button></div>
+  </>;
+}
 function Modal({modal,setModal,state,update,showToast}){
   const [form,setForm]=useState(()=>{
     if(modal.type==='employee'){
@@ -1147,53 +1197,7 @@ function Modal({modal,setModal,state,update,showToast}){
             showToast('Enrolled — progress tracked'); close();
           }}>Enroll</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
         </>}
-        {modal.type==='courseView' && (()=>{ const tr=state.trainings.find(t=>t.id===modal.data); const isEmployee=state.currentRole==='employee'; const myId=state.viewingEmployeeId||state.employees[0]?.id; const en=state.enrollments.find(e=>e.employeeId===myId && e.trainingId===tr.id); const [quizIdx,setQuizIdx]=useState(0); const [answers,setAnswers]=useState({}); const [showResult,setShowResult]=useState(null);
-          const quizQuestions=[
-            {q:'What is the primary goal of this training?', a:['Compliance','Entertainment','None'], correct:0},
-            {q:'Pass mark for the test is?', a:['50%','70%','90%'], correct:1},
-            {q:'Who should report an incident?', a:['Only manager','Everyone','No one'], correct:1},
-          ];
-          function submitQuiz(){
-            let score=0; quizQuestions.forEach((qq,i)=>{ if(answers[i]===qq.correct) score++; });
-            const pct=Math.round(100*score/quizQuestions.length);
-            const pass=pct>=70;
-            setShowResult({score:pct, pass});
-            if(pass){
-              update(s=>{
-                let my=s.enrollments.find(e=>e.employeeId===myId && e.trainingId===tr.id);
-                if(!my){ my={id:uid(), employeeId:myId, trainingId:tr.id, progress:0, completedModules:[], enrolledAt:new Date().toISOString().slice(0,10), completedAt:null, score:null, certificateId:null}; s.enrollments.push(my); }
-                const quizMod=tr.modules.find(m=>m.type==='quiz');
-                if(quizMod && !my.completedModules.includes(quizMod.id)) my.completedModules.push(quizMod.id);
-                // also mark doc modules as viewed
-                tr.modules.filter(m=>m.type!=='quiz').forEach(m=>{ if(!my.completedModules.includes(m.id)) my.completedModules.push(m.id); });
-                my.progress=Math.round(100*my.completedModules.length/tr.modules.length);
-                my.score=pct;
-                if(my.progress===100 && !my.certificateId){ const cid=uid(); my.certificateId=cid; my.completedAt=new Date().toISOString().slice(0,10); s.certificates.push({id:cid, employeeId:myId, trainingId:tr.id, issuedAt:my.completedAt, score:pct}); }
-              });
-            }
-          }
-          return <>
-            <div style={{background:'rgba(32,21,38,0.05)',borderRadius:8,padding:12,marginBottom:12}}><div style={{fontSize:11,opacity:0.6}}>{tr.category} · {tr.duration} · {tr.required?'Required':''}</div><div style={{fontWeight:700,marginTop:4}}>{tr.title}</div><div style={{fontSize:12,opacity:0.7,marginTop:4}}>{tr.description}</div></div>
-            <div style={{fontSize:11,fontWeight:600,letterSpacing:0.05+'em',textTransform:'uppercase',opacity:0.6,marginBottom:6}}>Modules — Staff & HR can view & take tests</div>
-            {tr.modules.map((m,i)=> <div key={m.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#fff',border:'1px solid rgba(32,21,38,0.08)',borderRadius:6,marginBottom:6}}>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{i+1}. {m.title} <span style={{fontSize:10,background:m.type==='quiz'?'#E2735B':'#E0E2E8',color:m.type==='quiz'?'#fff':'#201526',padding:'2px 6px',borderRadius:10}}>{m.type}</span></div><div style={{fontSize:11,opacity:0.6}}>{m.duration} · {m.content}</div></div>
-              {m.type==='quiz' ? <button onClick={()=>{ setQuizIdx(0); setShowResult(null); setAnswers({}); document.getElementById('quiz-area').scrollIntoView({behavior:'smooth'}); }} style={{background:'#4C8577',color:'#fff',border:'none',padding:'6px 10px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Take Test</button> : <span style={{fontSize:11,background:'#EDEEF2',padding:'4px 8px',borderRadius:5}}>View</span>}
-            </div>)}
-            <div id="quiz-area" style={{marginTop:14,background:'#fff',border:'1px solid #ddd',borderRadius:8,padding:14}}>
-              <div style={{fontWeight:700,fontSize:13}}>Test — {tr.title} (70% to pass)</div>
-              {showResult ? <div style={{textAlign:'center',padding:16}}><div style={{fontSize:22,fontWeight:700,color: showResult.pass?'#4C8577':'#E2735B'}}>{showResult.pass?'Passed ✓':'Failed'}</div><div style={{fontFamily:'monospace',fontSize:18,marginTop:6}}>{showResult.score}%</div><div style={{fontSize:11,opacity:0.6,marginTop:4}}>{showResult.pass?'Certificate generated in Training → Certificates':'Try again — review modules'}</div><button onClick={()=>setShowResult(null)} style={{marginTop:10,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Retake</button></div> :
-              <div>
-                {quizQuestions.map((qq,i)=> <div key={i} style={{marginTop:10,padding:10,background:'rgba(32,21,38,0.04)',borderRadius:6}}>
-                  <div style={{fontSize:12,fontWeight:600}}>{i+1}. {qq.q}</div>
-                  <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>{qq.a.map((opt,oi)=> <label key={oi} style={{fontSize:11,background: answers[i]===oi?'#201526':'#fff',color:answers[i]===oi?'#fff':'#201526',border:'1px solid #ddd',padding:'5px 10px',borderRadius:20,cursor:'pointer'}}><input type="radio" name={`q${i}`} checked={answers[i]===oi} onChange={()=>setAnswers({...answers,[i]:oi})} style={{display:'none'}}/>{opt}</label>)}</div>
-                </div>)}
-                <button onClick={submitQuiz} style={{marginTop:12,background:'#E2735B',color:'#fff',border:'none',padding:'8px 14px',borderRadius:6,fontSize:12,cursor:'pointer',width:'100%'}}>Submit Test</button>
-                <div style={{fontSize:10,opacity:0.55,marginTop:6}}>Both Staff and HR/Admin can take this test — same questions, offline scored, progress saved.</div>
-              </div>}
-            </div>
-            <div style={{marginTop:12,textAlign:'right'}}><button onClick={close} style={{background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Close</button></div>
-          </>;
-        })()}
+        {modal.type==='courseView' && <CourseView tr={state.trainings.find(t=>t.id===modal.data)} state={state} update={update} showToast={showToast} close={close} />}
         {modal.type==='leave' && <>
           <div className="field"><label>Staff</label><select value={form.employeeId||state.employees.filter(e=>e.active)[0]?.id} onChange={e=>setForm({...form,employeeId:e.target.value})} disabled={state.currentRole==='employee'}>{state.employees.filter(e=>e.active).map(e=> <option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
           <div className="field"><label>Leave type</label><select value={form.type||'annual'} onChange={e=>setForm({...form,type:e.target.value})}>{LEAVE_TYPES.map(t=> <option key={t.key} value={t.key}>{t.label} ({t.days}d/year)</option>)}</select></div>
