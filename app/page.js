@@ -95,12 +95,23 @@ function migrateState(s){
     {title:'Grit & Resilience', def:{category:'Mindset', duration:'2h', description:'Growth mindset, perseverance through obstacles, grit at work.', modules:[{title:'Grit Principles',type:'doc',duration:'30m'},{title:'Resilience Stories',type:'video',duration:'40m'},{title:'Quiz — Grit',type:'quiz',duration:'15m'}]}},
     {title:'Effective Communication', def:{category:'Skills', duration:'1h', description:'Clear writing, active listening, feedback without friction.', modules:[{title:'Communication Essentials',type:'doc',duration:'30m'},{title:'Practice: Feedback Lab',type:'assignment',duration:'20m'}]}},
   ];
-  mustHave.forEach(m=>{
-    if(!s.trainings.some(t=>t.title===m.title)){
-      s.trainings.push({id:uid(), title:m.title, category:m.def.category, duration:m.def.duration, description:m.def.description, required:false, createdAt:new Date().toISOString().slice(0,10), modules: m.def.modules.map(mm=>({id:uid(), title:mm.title, type:mm.type, content:mm.type==='quiz'?'Pass 70%':mm.title, duration:mm.duration}))});
+  // ensure all 6 preloaded courses exist (migrate old installs that had only 3)
+  const seedAllTitles=['Workplace Safety Essentials','HR Compliance & Ethics','Customer Service Excellence','Work-Life Balance','Grit & Resilience','Effective Communication'];
+  if(s.trainings.length < 6 || !seedAllTitles.every(t=> s.trainings.some(x=>x.title===t))){
+    // inject missing via full reseed but keep enrollments if possible — just add missing
+    mustHave.forEach(m=>{
+      if(!s.trainings.some(t=>t.title===m.title)){
+        s.trainings.push({id:uid(), title:m.title, category:m.def.category, duration:m.def.duration, description:m.def.description, required:false, createdAt:new Date().toISOString().slice(0,10), modules: m.def.modules.map(mm=>({id:uid(), title:mm.title, type:mm.type, content:mm.type==='quiz'?'Pass 70%':mm.title, duration:mm.duration}))});
+        changed=true;
+      }
+    });
+    const coreMissing=['Workplace Safety Essentials','HR Compliance & Ethics'].filter(t=> !s.trainings.some(x=>x.title===t));
+    coreMissing.forEach(title=>{
+      const isWorkplace=title==='Workplace Safety Essentials';
+      s.trainings.unshift({id:uid(), title, category:'Compliance', duration:isWorkplace?'2h':'1.5h', description:isWorkplace?'Mandatory safety, hygiene and emergency procedures for all staff.':'Code of conduct, data protection, anti-harassment.', required:true, createdAt:new Date().toISOString().slice(0,10), modules: isWorkplace? [{id:uid(),title:'Safety Policies & Emergency Exits',type:'doc',content:'Review safety handbook',duration:'30m'},{id:uid(),title:'Hygiene & Incident Reporting',type:'video',content:'Video demo',duration:'45m'},{id:uid(),title:'Quiz — Safety',type:'quiz',content:'Pass mark 70%',duration:'15m'}] : [{id:uid(),title:'Code of Conduct',type:'doc',content:'Company code',duration:'30m'},{id:uid(),title:'Quiz — Ethics',type:'quiz',content:'Pass mark 70%',duration:'15m'}]});
       changed=true;
-    }
-  });
+    });
+  }
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
@@ -985,10 +996,11 @@ function MyProfile({state}){
 }
 
 function CourseView({tr, state, update, showToast, close}){
-  const isEmployee=state.currentRole==='employee';
-  const myId=state.viewingEmployeeId||state.employees[0]?.id;
   const [answers,setAnswers]=useState({});
   const [showResult,setShowResult]=useState(null);
+  if(!tr) return <div style={{padding:20,color:'#8C3B28'}}>Course not found — please click Reset demo or hard refresh (Ctrl+Shift+R).</div>;
+  const isEmployee=state.currentRole==='employee';
+  const myId=state.viewingEmployeeId||state.employees[0]?.id;
   const quizQuestions=[
     {q:'What is the primary goal of this training?', a:['Compliance','Entertainment','None'], correct:0},
     {q:'Pass mark for the test is?', a:['50%','70%','90%'], correct:1},
