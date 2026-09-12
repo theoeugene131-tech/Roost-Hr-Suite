@@ -22,13 +22,13 @@ const DOC_TYPES = [
   {key:'annual', label:'Annual Appraisal', category:'Appraisals', required:false},
 ];
 const TAB_LABELS = {
-  overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', runpayroll:'Run payroll', history:'History',
+  overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', training:'Training', runpayroll:'Run payroll', history:'History',
   compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile'
 };
 function visibleTabs(role){
-  if(role==='employee') return ['myprofile'];
-  if(role==='admin') return ['overview','team','docs','regulatory','runpayroll','history','compliance','reviews','hiring'];
-  return ['overview','team','docs','regulatory','runpayroll','history','compliance','reviews','hiring','reports'];
+  if(role==='employee') return ['myprofile','training'];
+  if(role==='admin') return ['overview','team','docs','regulatory','training','runpayroll','history','compliance','reviews','hiring'];
+  return ['overview','team','docs','regulatory','training','runpayroll','history','compliance','reviews','hiring','reports'];
 }
 function initials(name){ return name.trim().split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase(); }
 function money(n){ return '₦' + Math.round(n).toLocaleString('en-NG'); }
@@ -69,12 +69,14 @@ function complianceStatus(state, period, item){
 function migrateState(s){
   let changed=false;
   if(!s.companyName){ s.companyName=''; changed=true; }
+  if(!s.trainings){ s.trainings=[]; changed=true; }
+  if(!s.enrollments){ s.enrollments=[]; changed=true; }
+  if(!s.certificates){ s.certificates=[]; changed=true; }
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
     if(e.passportPhoto===undefined){ e.passportPhoto=null; changed=true; }
     DOC_TYPES.forEach(dt=>{ if(e.documents[dt.key]===undefined) e.documents[dt.key]=null; });
-    // sync avatar ↔ passport doc — passport photo hits profile picture
     if(e.passportPhoto && !e.documents['passport']){ e.documents['passport']={fileName:'passport.jpg', size:0, uploadedAt: new Date().toISOString().slice(0,10), dataUrl:e.passportPhoto, status:'verified'}; changed=true; }
     if(e.documents['passport']?.dataUrl && !e.passportPhoto){ e.passportPhoto=e.documents['passport'].dataUrl; changed=true; }
   });
@@ -109,7 +111,27 @@ function seedDemo(){
     {id:uid(), name:'Femi Bello', role:'Sales Associate', stage:'Applied', appliedDate:fmt(addDays(today,-2)), notes:''},
     {id:uid(), name:'Kelechi Ude', role:'Accountant (Assistant)', stage:'Offer', appliedDate:fmt(addDays(today,-12)), notes:'Offer sent'},
   ];
-  return {companyName:'', employees, runs:[], compliance:{}, reviews, candidates, currentRole:'owner', viewingEmployeeId:null};
+  const trainings=[
+    {id:uid(), title:'Workplace Safety Essentials', category:'Compliance', duration:'2h', description:'Mandatory safety, hygiene and emergency procedures for all staff.', modules:[
+      {id:uid(), title:'Safety Policies & Emergency Exits', type:'doc', content:'Review safety handbook (PDF) attached', duration:'30m'},
+      {id:uid(), title:'Hygiene & Incident Reporting', type:'video', content:'Video: incident reporting demo', duration:'45m'},
+      {id:uid(), title:'Quiz — Safety', type:'quiz', content:'Pass mark 70% (3 attempts)', duration:'15m'},
+    ], required:true, createdAt:fmt(today)},
+    {id:uid(), title:'HR Compliance & Ethics', category:'Compliance', duration:'1.5h', description:'Code of conduct, data protection, anti-harassment.', modules:[
+      {id:uid(), title:'Code of Conduct', type:'doc', content:'Company code of conduct', duration:'30m'},
+      {id:uid(), title:'Quiz — Ethics', type:'quiz', content:'Pass mark 70%', duration:'15m'},
+    ], required:true, createdAt:fmt(today)},
+    {id:uid(), title:'Customer Service Excellence', category:'Skills', duration:'3h', description:'For frontline roles — handling complaints, empathy.', modules:[
+      {id:uid(), title:'Service Framework', type:'doc', content:'Service playbook', duration:'60m'},
+      {id:uid(), title:'Role-play Exercise', type:'assignment', content:'Submit reflection note', duration:'30m'},
+    ], required:false, createdAt:fmt(today)},
+  ];
+  const enrollments=[
+    {id:uid(), employeeId:employees[2].id, trainingId: trainings[0].id, progress:66, completedModules:[trainings[0].modules[0].id], enrolledAt:fmt(addDays(today,-10)), completedAt:null, score:null, certificateId:null},
+    {id:uid(), employeeId:employees[0].id, trainingId: trainings[1].id, progress:100, completedModules: trainings[1].modules.map(m=>m.id), enrolledAt:fmt(addDays(today,-20)), completedAt:fmt(addDays(today,-5)), score:85, certificateId: uid()},
+  ];
+  const certificates=enrollments.filter(e=>e.certificateId).map(e=>({id:e.certificateId, employeeId:e.employeeId, trainingId:e.trainingId, issuedAt:e.completedAt, score:e.score}));
+  return {companyName:'', employees, runs:[], compliance:{}, reviews, candidates, trainings, enrollments, certificates, currentRole:'owner', viewingEmployeeId:null};
 }
 
 export default function Page(){
@@ -285,6 +307,7 @@ export default function Page(){
         {currentTab==='team' && <Team state={state} update={update} setModal={setModal} showToast={showToast} />}
         {currentTab==='docs' && <Documents state={state} update={update} setModal={setModal} showToast={showToast} docFilter={docFilter} setDocFilter={setDocFilter} />}
         {currentTab==='regulatory' && <Regulatory state={state} update={update} />}
+        {currentTab==='training' && <Training state={state} update={update} setModal={setModal} showToast={showToast} />}
         {currentTab==='runpayroll' && <RunPayroll state={state} update={update} setCurrentTab={setCurrentTab} showToast={showToast} />}
         {currentTab==='history' && <History state={state} expandedRun={expandedRun} setExpandedRun={setExpandedRun} />}
         {currentTab==='compliance' && <Compliance state={state} update={update} />}
@@ -512,6 +535,122 @@ function printSchedule({companyName, period, lines}){
   </body></html>`);
   w.document.close();
 }
+function printCertificate({companyName, cert, employee, training}){
+  const w=window.open('','_blank');
+  if(!w){ alert('Allow pop-ups'); return; }
+  w.document.write(`
+  <html><head><title>Certificate — ${training.title}</title>
+  <style>body{font-family:Newsreader, serif; display:flex; align-items:center; justify-content:center; min-height:100vh; background:#f7f5ef; margin:0; padding:32px}
+  .cert{background:#fff; border:6px double #201526; padding:40px 48px; max-width:720px; width:100%; text-align:center}
+  h1{font-size:28px; margin:0; font-style:italic} h2{font-size:15px; color:#555; margin:8px 0}
+  .name{font-size:26px; font-weight:700; margin:18px 0 4px} .score{font-family:monospace; color:#4C8577}
+  .foot{margin-top:32px; display:grid; grid-template-columns:1fr 1fr; gap:24px; font-size:12px} .foot div{border-top:1px solid #222; padding-top:6px}
+  @media print{ button{display:none} }
+  </style></head><body>
+  <div class="cert">
+    <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#888">${companyName||'Company'}</div>
+    <h1>Certificate of Completion</h1><h2>${training.title} · ${training.category}</h2>
+    <div style="margin:20px 0; font-size:13px">This is to certify that</div>
+    <div class="name">${employee.name}</div><div style="font-size:12px; opacity:0.7">${employee.role} · ${companyName||''}</div>
+    <div style="margin:18px 0; font-size:13px">has successfully completed the training with score <span class="score">${cert.score||'—'}%</span></div>
+    <div style="font-size:11px; color:#666">Issued ${new Date(cert.issuedAt).toLocaleDateString('en-NG')} · Certificate ID ${cert.id.slice(0,8).toUpperCase()} · Roost by Next Level Global</div>
+    <div class="foot"><div>Training Coordinator<br/><br/>Signature / Date</div><div>CEO / HR Head<br/><br/>Signature / Date</div></div>
+    <div style="margin-top:18px"><button onclick="window.print()" style="padding:10px 18px; background:#201526; color:#fff; border:none; border-radius:6px; cursor:pointer">Print / Save PDF</button> <button onclick="window.close()" style="padding:10px 18px">Close</button></div>
+  </div></body></html>`);
+  w.document.close();
+}
+function Training({state,update,setModal,showToast}){
+  const [tab,setTab]=useState('catalog');
+  const enrolledCount=state.enrollments.length;
+  const completedCount=state.enrollments.filter(e=>e.progress===100).length;
+  const pendingCount=enrolledCount-completedCount;
+  const certCount=state.certificates.length;
+  return (<>
+    <div className="panel-head"><div><h2>Training Suite</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Courses + Assignments + Progress + Certificates — offline & printable</p></div>
+      <div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>setModal({type:'course'})}>+ New course</button><button className="btn" style={{background:'#fff',color:'#201526'}} onClick={()=>setModal({type:'enroll'})}>+ Enroll staff</button></div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12,marginBottom:14}}>
+      <div style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:12}}><div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase'}}>Courses</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{state.trainings.length}</div></div>
+      <div style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:12}}><div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase'}}>Enrolled</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{enrolledCount}</div></div>
+      <div style={{background:'var(--teal)',borderRadius:8,padding:12,color:'#fff'}}><div style={{fontSize:10,textTransform:'uppercase',opacity:0.85}}>Completed</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{completedCount}</div></div>
+      <div style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:12}}><div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase'}}>Pending</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{pendingCount}</div></div>
+      <div style={{background:'var(--paper)',color:'#201526',borderRadius:8,padding:12}}><div style={{fontSize:10,opacity:0.55,textTransform:'uppercase'}}>Certificates</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{certCount}</div></div>
+    </div>
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+      {['catalog','enrollments','certificates'].map(t=> <button key={t} onClick={()=>setTab(t)} style={{padding:'6px 12px',borderRadius:20,fontSize:12,border:'1px solid var(--line)',background:tab===t?'var(--paper)':'transparent',color:tab===t?'#201526':'var(--muted)',cursor:'pointer',textTransform:'capitalize'}}>{t}</button>)}
+    </div>
+
+    {tab==='catalog' && <div className="grid">
+      {state.trainings.map(tr=>{
+        const enrolled=state.enrollments.filter(e=>e.trainingId===tr.id).length;
+        return <div key={tr.id} className="card" style={{gap:10}}>
+          <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:10,background:tr.required?'#E2735B':'#E0E2E8',color:tr.required?'#fff':'#201526',padding:'3px 7px',borderRadius:20}}>{tr.category} {tr.required?'· Required':''}</span><span style={{fontSize:11,opacity:0.55}}>{tr.duration}</span></div>
+          <div style={{fontWeight:700,fontSize:15}}>{tr.title}</div><div style={{fontSize:12,opacity:0.7,lineHeight:1.4}}>{tr.description}</div>
+          <div style={{fontSize:11,opacity:0.65}}>{tr.modules.length} modules: {tr.modules.map(m=>m.title).join(' · ')}</div>
+          <div style={{display:'flex',gap:6,marginTop:4,flexWrap:'wrap'}}>
+            <button onClick={()=>setModal({type:'enroll', preset:tr.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Enroll staff ({enrolled})</button>
+            <button onClick={()=>setModal({type:'editCourse', data:tr.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Edit</button>
+            <button onClick={()=>{ if(confirm('Delete course?')) update(s=>{ s.trainings=s.trainings.filter(x=>x.id!==tr.id); s.enrollments=s.enrollments.filter(e=>e.trainingId!==tr.id); }); }} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',borderRadius:5,padding:'6px 10px',fontSize:11,cursor:'pointer'}}>Remove</button>
+          </div>
+        </div>;
+      })}
+      {state.trainings.length===0 && <div style={{color:'var(--muted)',padding:20}}>No courses yet — create your first.</div>}
+    </div>}
+
+    {tab==='enrollments' && <div style={{background:'#EDEEF2',borderRadius:8,padding:8}}>
+      {state.enrollments.length===0? <div style={{color:'rgba(32,21,38,0.6)',textAlign:'center',padding:24}}>No enrollments yet.</div> :
+      <table style={{width:'100%',borderCollapse:'collapse',color:'#201526',fontSize:12}}>
+        <thead><tr style={{background:'#E0E2E8'}}><th style={{textAlign:'left',padding:'8px'}}>Staff</th><th style={{textAlign:'left',padding:'8px'}}>Course</th><th style={{textAlign:'center',padding:'8px'}}>Progress</th><th style={{textAlign:'center',padding:'8px'}}>Score</th><th style={{textAlign:'left',padding:'8px'}}>Action</th></tr></thead>
+        <tbody>{state.enrollments.map(en=>{
+          const emp=state.employees.find(e=>e.id===en.employeeId);
+          const tr=state.trainings.find(t=>t.id===en.trainingId);
+          return <tr key={en.id} style={{borderBottom:'1px solid rgba(32,21,38,0.07)'}}>
+            <td style={{padding:'8px',fontWeight:600}}>{emp?emp.name:'—'}</td>
+            <td style={{padding:'8px'}}>{tr?tr.title:'—'}</td>
+            <td style={{padding:'8px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{flex:1,height:6,background:'rgba(32,21,38,0.1)',borderRadius:6,overflow:'hidden'}}><div style={{width:`${en.progress}%`,height:'100%',background:en.progress===100?'#4C8577':'#E2735B'}}/></div><span style={{fontFamily:'monospace',fontSize:11}}>{en.progress}%</span></div>
+              <div style={{fontSize:10,opacity:0.55}}>{en.completedModules.length}/{tr?.modules.length||0} modules</div>
+            </td>
+            <td style={{textAlign:'center',padding:'8px',fontFamily:'monospace'}}>{en.score ?? '—'}{en.score!==null?'%':''}</td>
+            <td style={{padding:'8px',display:'flex',gap:6,flexWrap:'wrap'}}>
+              {en.progress<100 && <button onClick={()=>{
+                const tr2=state.trainings.find(t=>t.id===en.trainingId);
+                const next=tr2.modules.find(m=>!en.completedModules.includes(m.id));
+                if(!next) return;
+                const score=next.type==='quiz'? Math.floor(70+Math.random()*30) : null;
+                update(s=>{
+                  const e=s.enrollments.find(x=>x.id===en.id);
+                  e.completedModules.push(next.id);
+                  e.progress=Math.round(100*e.completedModules.length/tr2.modules.length);
+                  if(score!==null) e.score=score;
+                  if(e.progress===100){ e.completedAt=new Date().toISOString().slice(0,10); const certId=uid(); e.certificateId=certId; s.certificates.push({id:certId, employeeId:e.employeeId, trainingId:e.trainingId, issuedAt:e.completedAt, score:e.score}); }
+                });
+                showToast(next.title+' completed');
+              }} style={{fontSize:11,background:'#201526',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Complete next</button>}
+              {en.progress===100 && <button onClick={()=>{ const cert=state.certificates.find(c=>c.id===en.certificateId); const emp2=state.employees.find(e=>e.id===en.employeeId); const tr2=state.trainings.find(t=>t.id===en.trainingId); if(cert&&emp2&&tr2) printCertificate({companyName:state.companyName, cert, employee:emp2, training:tr2}); }} style={{fontSize:11,background:'#4C8577',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Certificate</button>}
+              <button onClick={()=>{ if(confirm('Unenroll?')) update(s=>{ s.enrollments=s.enrollments.filter(x=>x.id!==en.id); s.certificates=s.certificates.filter(c=>c.id!==en.certificateId); }); }} style={{fontSize:11,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>
+            </td>
+          </tr>;
+        })}</tbody>
+      </table>}
+    </div>}
+
+    {tab==='certificates' && <div className="grid">
+      {state.certificates.map(c=>{
+        const emp=state.employees.find(e=>e.id===c.employeeId);
+        const tr=state.trainings.find(t=>t.id===c.trainingId);
+        return <div key={c.id} style={{background:'#fff',color:'#201526',borderRadius:8,padding:16,border:'2px solid #EDEEF2'}}>
+          <div style={{fontSize:10,letterSpacing:0.1+'em',textTransform:'uppercase',opacity:0.55}}>{state.companyName||'Company'} · Certificate</div>
+          <div style={{fontFamily:'Newsreader',fontStyle:'italic',fontSize:16,fontWeight:700,marginTop:4}}>{tr?tr.title:'Course'}</div>
+          <div style={{fontSize:13,marginTop:6}}>Awarded to <b>{emp?emp.name:'—'}</b> · {emp?emp.role:''}</div>
+          <div style={{fontSize:11,opacity:0.6,marginTop:4}}>Issued {new Date(c.issuedAt).toLocaleDateString('en-NG')} · ID {c.id.slice(0,8).toUpperCase()} · Score {c.score||'—'}%</div>
+          <button onClick={()=>printCertificate({companyName:state.companyName, cert:c, employee:emp, training:tr})} style={{marginTop:10,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Print / Save PDF</button>
+        </div>;
+      })}
+      {state.certificates.length===0 && <div style={{color:'var(--muted)',padding:20}}>No certificates yet — complete a training to generate.</div>}
+    </div>}
+  </>);
+}
 function RunPayroll({state,update,setCurrentTab,showToast}){
   const period=nextPeriod(state.runs);
   const active=state.employees.filter(e=>e.active);
@@ -661,6 +800,9 @@ function Modal({modal,setModal,state,update,showToast}){
     }
     if(modal.type==='review') return {emp:state.employees.filter(e=>e.active)[0]?.id||'',rating:0,notes:''};
     if(modal.type==='candidate') return {name:'',role:'',notes:''};
+    if(modal.type==='course') return {title:'',category:'Compliance',duration:'2h',description:'',required:true};
+    if(modal.type==='editCourse'){ const tr=state.trainings.find(x=>x.id===modal.data); return {title:tr.title,category:tr.category,duration:tr.duration,description:tr.description,required:tr.required}; }
+    if(modal.type==='enroll') return {employeeId: state.employees.filter(e=>e.active)[0]?.id||'', trainingId: modal.preset|| state.trainings[0]?.id||''};
     return {};
   });
   const [ids,setIds]=useState(()=>{ if(modal.type==='staffDocs'){ const e=state.employees.find(x=>x.id===modal.data); return {nin:e.nin||'',payeTin:e.payeTin||'',nhfNumber:e.nhfNumber||'',pensionPin:e.pensionPin||'',nsitfNumber:e.nsitfNumber||''}; } return {}; });
@@ -750,7 +892,7 @@ function Modal({modal,setModal,state,update,showToast}){
     <div className="overlay" onClick={e=>{if(e.target.classList.contains('overlay')) close();}}>
       <div className="modal">
         <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}><h3 style={{fontFamily:'Newsreader',fontSize:20,fontWeight:600}}>
-          {modal.type==='employee' ? (modal.data?'Edit teammate':'Add teammate') : modal.type==='review' ? 'Add review' : 'Add candidate'}
+          {modal.type==='employee' ? (modal.data?'Edit teammate':'Add teammate') : modal.type==='review' ? 'Add review' : modal.type==='candidate' ? 'Add candidate' : modal.type==='course' ? 'New course' : modal.type==='editCourse' ? 'Edit course' : modal.type==='enroll' ? 'Enroll staff' : ''}
         </h3><button onClick={close} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,opacity:0.55}}>✕</button></div>
 
         {modal.type==='employee' && <>
@@ -779,6 +921,36 @@ function Modal({modal,setModal,state,update,showToast}){
           <div className="field"><label>Role applying for</label><input value={form.role} onChange={e=>setForm({...form,role:e.target.value})}/></div>
           <div className="field"><label>Notes</label><input value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
           <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{ if(!form.name||!form.role){alert('Fill name & role');return;} update(s=>{s.candidates.push({id:uid(),name:form.name,role:form.role,stage:'Applied',appliedDate:new Date().toISOString().slice(0,10),notes:form.notes});}); showToast('Candidate added'); close();}}>Add candidate</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
+        </>}
+        {modal.type==='course' && <>
+          <div className="field"><label>Title *</label><input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="e.g. Data Protection"/></div>
+          <div className="field-row"><div className="field"><label>Category</label><select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}><option>Compliance</option><option>Skills</option><option>Onboarding</option><option>Safety</option></select></div><div className="field"><label>Duration</label><input value={form.duration} onChange={e=>setForm({...form,duration:e.target.value})} placeholder="2h"/></div></div>
+          <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="What will staff learn?"/></div>
+          <div className="field"><label><input type="checkbox" checked={form.required} onChange={e=>setForm({...form,required:e.target.checked})}/> Required for all staff</label></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+            if(!form.title){ alert('Title required'); return;}
+            update(s=>{ s.trainings.push({id:uid(), title:form.title, category:form.category, duration:form.duration, description:form.description, required:form.required, createdAt:new Date().toISOString().slice(0,10), modules:[{id:uid(), title:'Module 1 — Overview', type:'doc', content:'Introduction', duration:'30m'}]}); });
+            showToast('Course created'); close();
+          }}>Create course</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
+        </>}
+        {modal.type==='editCourse' && <>
+          <div className="field"><label>Title *</label><input value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></div>
+          <div className="field-row"><div className="field"><label>Category</label><select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}><option>Compliance</option><option>Skills</option><option>Onboarding</option><option>Safety</option></select></div><div className="field"><label>Duration</label><input value={form.duration} onChange={e=>setForm({...form,duration:e.target.value})}/></div></div>
+          <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></div>
+          <div className="field"><label><input type="checkbox" checked={form.required} onChange={e=>setForm({...form,required:e.target.checked})}/> Required</label></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+            update(s=>{ const tr=s.trainings.find(x=>x.id===modal.data); Object.assign(tr,{title:form.title,category:form.category,duration:form.duration,description:form.description,required:form.required});});
+            showToast('Course updated'); close();
+          }}>Save</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
+        </>}
+        {modal.type==='enroll' && <>
+          <div className="field"><label>Staff</label><select value={form.employeeId} onChange={e=>setForm({...form,employeeId:e.target.value})}>{state.employees.filter(e=>e.active).map(e=> <option key={e.id} value={e.id}>{e.name} — {e.role}</option>)}</select></div>
+          <div className="field"><label>Course</label><select value={form.trainingId} onChange={e=>setForm({...form,trainingId:e.target.value})}>{state.trainings.map(t=> <option key={t.id} value={t.id}>{t.title} ({t.category})</option>)}</select></div>
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+            if(state.enrollments.some(en=>en.employeeId===form.employeeId && en.trainingId===form.trainingId)){ alert('Already enrolled'); return; }
+            update(s=>{ s.enrollments.push({id:uid(), employeeId:form.employeeId, trainingId:form.trainingId, progress:0, completedModules:[], enrolledAt:new Date().toISOString().slice(0,10), completedAt:null, score:null, certificateId:null}); });
+            showToast('Enrolled — progress tracked'); close();
+          }}>Enroll</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
         </>}
 
       </div>
