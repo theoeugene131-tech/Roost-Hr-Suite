@@ -671,7 +671,11 @@ function printCertificate({companyName, cert, employee, training}){
 function Training({state,update,setModal,showToast}){
   const [tab,setTab]=useState('catalog');
   const isEmployee=state.currentRole==='employee';
-  const myId=state.viewingEmployeeId || state.employees[0]?.id;
+  const myId=state.viewingEmployeeId||state.employees[0]?.id;
+  // force trainings to exist — if corrupted localStorage, seed robust 6
+  if(!state.trainings || state.trainings.length===0){
+    return <div style={{padding:20,textAlign:'center'}}><div style={{color:'#8C3B28'}}>Courses not loaded — local data corrupted.</div><button className="btn btn-primary" style={{marginTop:10}} onClick={()=>{ if(confirm('Reload 6 robust courses?')){ const fresh=seedDemo(); update(s=>{ s.trainings=fresh.trainings; s.enrollments=fresh.enrollments; s.certificates=fresh.certificates; }); showToast('Courses restored'); } }}>Reload 6 Courses</button><button className="btn" style={{marginLeft:8, marginTop:10}} onClick={()=>{ localStorage.clear(); location.reload(); }}>Hard Reset</button></div>;
+  }
   const visibleEnrollments=isEmployee? state.enrollments.filter(e=>e.employeeId===myId) : state.enrollments;
   const visibleCerts=isEmployee? state.certificates.filter(c=>c.employeeId===myId) : state.certificates;
   const enrolledCount=visibleEnrollments.length;
