@@ -75,7 +75,9 @@ function complianceStatus(state, period, item){
 function migrateState(s){
   let changed=false;
   if(!s.companyName){ s.companyName=''; changed=true; }
-  if(!s.trainings){ s.trainings=[]; changed=true; }
+  if(!s.trainings || s.trainings.length===0){ 
+    const fresh=seedDemo(); s.trainings=fresh.trainings; s.enrollments=fresh.enrollments; s.certificates=fresh.certificates; changed=true;
+  }
   if(!s.enrollments){ s.enrollments=[]; changed=true; }
   if(!s.certificates){ s.certificates=[]; changed=true; }
   if(!s.leaves){ s.leaves=[]; changed=true; }
