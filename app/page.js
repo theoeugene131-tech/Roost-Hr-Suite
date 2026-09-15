@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { loadState, saveState } from "@/lib/store";
 import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense } from "@/lib/license";
+import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
 
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -67,6 +68,18 @@ function estimateDeductions(gross){
   const nsitf=Math.round(gross*0.01);
   const net=gross-monthlyPAYE-pensionEmployee-nhf;
   return {monthlyPAYE,pensionEmployee,pensionEmployer,nhf,nsitf,net};
+}
+// ---- Cloud backend (opt-in) helpers ----
+// Map backend employee rows to the local state shape (frontend-only extras
+// like avatar color, department, documents stay local).
+const CLOUD_OFF_KEY='roost_cloud_off';
+function cloudEmployeeToLocal(e,i){
+  const docs={}; try{ DOC_TYPES.forEach(dt=> docs[dt.key]=null); }catch{}
+  return { id:e.id, name:e.name, role:e.role, gross:Number(e.gross)||0, bank:e.bank||'', account:e.account||'', startDate:e.startDate||'', dob:e.dob||'', active:e.active!==false, color:AVATAR_COLORS[(i||0)%AVATAR_COLORS.length], department:null, nin:e.nin||'', payeTin:e.payeTin||'', nhfNumber:e.nhfNumber||'', pensionPin:e.pensionPin||'', nsitfNumber:e.nsitfNumber||'', passportPhoto:null, documents:docs };
+}
+function cloudRunToLocal(r){
+  const lines=(r.lines||[]).map(l=>({ employeeId:l.employeeId, name:l.name, role:l.role, gross:l.gross, bank:l.bank||'', account:l.account||'', monthlyPAYE:l.monthlyPAYE, pensionEmployee:l.pensionEmployee, pensionEmployer:l.pensionEmployer, nhf:l.nhf, nsitf:Math.round((l.gross||0)*0.01), net:l.net }));
+  return { id:r.id, period:r.period, createdAt:r.createdAt, lines, status:r.status||'paid' };
 }
 function nextPeriod(runs){
   const now=new Date();
@@ -261,11 +274,56 @@ export default function Page(){
   const [licenseKey,setLicenseKey]=useState('');
   const [licenseOk,setLicenseOk]=useState(false);
   const [licenseChecking,setLicenseChecking]=useState(true);
+  const [apiUser,setApiUser]=useState(null);
+  const [cloudLoading,setCloudLoading]=useState(false);
+  const [authForm,setAuthForm]=useState({mode:'login',companyName:'',name:'',email:'',password:''});
+
+  function cloudOff(){
+    try{
+      const params=new URLSearchParams(window.location.search);
+      return params.get('local')==='1' || localStorage.getItem(CLOUD_OFF_KEY)==='1';
+    }catch{ return true; }
+  }
+  async function hydrateCloud(){
+    const me=getSessionUser();
+    if(me) setApiUser(me);
+    setCloudLoading(true);
+    try{
+      const [emps,runs]=await Promise.all([EmployeesAPI.list().catch(()=>null), PayrollAPI.list().catch(()=>null)]);
+      setState(s=>{
+        if(!s) return s;
+        const ns=JSON.parse(JSON.stringify(s));
+        if(Array.isArray(emps)){
+          if(me && me.role==='employee'){
+            ns.employees=emps.map((e,i)=>cloudEmployeeToLocal(e,i));
+            ns.currentRole='employee';
+            ns.viewingEmployeeId=me.employeeId||emps[0]?.id||null;
+          } else {
+            ns.employees=emps.map((e,i)=>{
+              const prev=(s.employees||[]).find(x=>x.id===e.id);
+              const m=cloudEmployeeToLocal(e,i);
+              if(prev){ m.color=prev.color; m.department=prev.department||m.department; m.documents=prev.documents||m.documents; m.passportPhoto=prev.passportPhoto||null; }
+              if(!m.department && ns.orgUnits && ns.orgUnits.length) m.department=ns.orgUnits[i%ns.orgUnits.length].id;
+              return m;
+            });
+          }
+        }
+        if(Array.isArray(runs)){
+          if(me && me.role==='employee'){
+            ns.runs=runs.map((r,i)=>({ id:'cloud-'+r.period+'-'+i, period:r.period, createdAt:r.createdAt, lines:r.line?[{...r.line,bank:r.line.bank||'',account:r.line.account||'',nsitf:Math.round((r.line.gross||0)*0.01)}]:[], status:'paid' }));
+          } else ns.runs=runs.map(cloudRunToLocal);
+        }
+        return ns;
+      });
+    }finally{ setCloudLoading(false); }
+  }
 
   useEffect(()=>{
     let loaded=loadState();
     if(loaded){ loaded=migrateState(loaded); setState(loaded); }
     else { const s=seedDemo(); setState(s); saveState(s); }
+    // Cloud backend (opt-in): hydrate employees + payroll when configured + logged in
+    try{ if(getApiBase() && !cloudOff() && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
     const updateOnline=()=>setOnline(navigator.onLine);
     updateOnline();
     window.addEventListener('online',updateOnline);
@@ -326,13 +384,18 @@ export default function Page(){
       </div>
     );
   }
-  const tabs=visibleTabs(state.currentRole);
+  const cloudBase=getApiBase();
+  const cloudMode=!!(cloudBase && !cloudOff() && apiUser && getToken());
+  const tabs=visibleTabs(cloudMode && apiUser.role==='employee' ? 'employee' : state.currentRole);
   const activeTabs=tabs.includes(currentTab)?currentTab:tabs[0];
   if(activeTabs!==currentTab) setCurrentTab(activeTabs);
   function update(fn){ setState(s=>{ const ns=JSON.parse(JSON.stringify(s)); fn(ns); return ns; }); }
   function showToast(m){ setToast(m); setTimeout(()=>setToast(null),2800); }
   const period=nextPeriod(state.runs);
   const activeEmployees=state.employees.filter(e=>e.active);
+  if(cloudBase && !cloudOff() && !apiUser){
+    return <AuthScreen authForm={authForm} setAuthForm={setAuthForm} showToast={showToast} onAuth={()=>{ hydrateCloud(); }} />;
+  }
 
   return (
     <>
@@ -410,6 +473,13 @@ export default function Page(){
             }} style={{background:'#4C8577',color:'#fff',border:'none',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer',fontWeight:700}}>⬇ Save / Backup</button>
             <label style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>⬆ Restore<input type="file" accept=".json" style={{display:'none'}} onChange={ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.employees) throw new Error('Invalid backup'); if(confirm(`Restore backup from ${j.companyName||'file'}? This will overwrite current data.`)){ const mig=migrateState(j); setState(mig); saveState(mig); showToast('Backup restored ✓'); }}catch(e){ alert('Invalid backup file'); } }; r.readAsText(f); }}/></label>
             <button onClick={()=>{ if(confirm('Reset to demo data?')){ const s=seedDemo(); setState(s); saveState(s); showToast('Demo data restored'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Reset demo</button>
+            {cloudMode
+              ? <span style={{fontSize:11,background:'rgba(76,133,119,0.2)',border:'1px solid rgba(76,133,119,0.5)',color:'#7FD1B9',borderRadius:6,padding:'8px 10px'}}>☁ {apiUser.email||apiUser.role}{cloudLoading?' · syncing…':''}</span>
+              : cloudBase
+                ? <span style={{fontSize:11,background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px'}}>○ Offline mode</span>
+                : null}
+            {cloudMode && <button onClick={()=>{ if(confirm('Sign out of cloud? Local offline copy is kept.')){ clearSession(); setApiUser(null); showToast('Signed out of cloud'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Sign out</button>}
+            {!cloudBase && <button onClick={()=>{ const u=prompt('Cloud backend URL (e.g. https://your-api.railway.app). Empty = stay offline:', ''); if(u && u.trim()){ setApiBaseOverride(u.trim()); location.reload(); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>☁ Connect backend</button>}
           </div>
           {state.currentRole!=='employee' && <div className="stats">
             <div className="stat"><div className="label">Team size</div><div className="value">{activeEmployees.length}</div></div>
@@ -497,14 +567,31 @@ function Overview({state,setModal}){
   </>);
 }
 function Team({state,update,setModal,showToast}){
+  const cloudOn=!!(getApiBase() && getToken());
+  const cloudRole=getSessionUser()?.role;
+  async function cloudToggle(e){
+    try{ const r=await EmployeesAPI.update(e.id,{active:!e.active}); update(s=>{ s.employees.find(x=>x.id===e.id).active=r.active!==false; }); showToast(r.active!==false?'Reactivated (cloud) ✓':'Deactivated (cloud) ✓'); }
+    catch(err){ showToast('Cloud update failed: '+err.message); }
+  }
+  async function cloudRemove(e){
+    if(!confirm('Remove this teammate?')) return;
+    try{ await EmployeesAPI.remove(e.id); update(s=>{ s.employees=s.employees.filter(x=>x.id!==e.id); }); showToast('Removed (cloud) ✓'); }
+    catch(err){ showToast('Cloud remove failed: '+err.message); }
+  }
+  async function cloudInvite(e){
+    const email=prompt(`Invite ${e.name} — their login email:`);
+    if(!email) return;
+    try{ const r=await AuthAPI.inviteEmployee({employeeId:e.id,email}); prompt('Share this one-time invite link (7-day expiry):', r.inviteUrl); showToast('Invite created ✓'); }
+    catch(err){ showToast('Invite failed: '+err.message); }
+  }
   return (<>
-    <div className="panel-head"><div><h2>Team</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Add, edit, or click name for documents</p></div><button className="btn btn-primary" onClick={()=>setModal({type:'employee',data:null})}>+ Add teammate</button></div>
+    <div className="panel-head"><div><h2>Team</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Add, edit, or click name for documents{cloudOn?' · ☁ cloud sync on':''}</p></div><div style={{display:'flex',gap:8}}><button className="btn btn-primary" onClick={()=>setModal({type:'employee',data:null})}>+ Add teammate</button></div></div>
     {state.employees.length===0? <div style={{color:'var(--muted)',textAlign:'center',padding:30}}>No teammates yet.</div> :
       <div className="grid">{state.employees.map(e=>{
         const d=estimateDeductions(e.gross);
         const progress=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
         return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',color:'#201526',textDecoration:'underline'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}{e.active?'':' · inactive'} · {progress}% docs</div></div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross monthly</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
-        <div style={{display:'flex',gap:6,marginTop:2,flexWrap:'wrap'}}><button onClick={()=>setModal({type:'staffDocs',data:e.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer'}}>📄 Docs</button><button onClick={()=>setModal({type:'employee',data:e.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>Edit</button><button onClick={()=>update(s=>{const emp=s.employees.find(x=>x.id===e.id); emp.active=!emp.active;})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>{e.active?'Deactivate':'Reactivate'}</button><button onClick={()=>{ if(confirm('Remove this teammate?')) update(s=>{s.employees=s.employees.filter(x=>x.id!==e.id);}); showToast('Removed');}} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.5)',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#E2735B'}}>Remove</button></div></div>;
+        <div style={{display:'flex',gap:6,marginTop:2,flexWrap:'wrap'}}><button onClick={()=>setModal({type:'staffDocs',data:e.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer'}}>📄 Docs</button><button onClick={()=>setModal({type:'employee',data:e.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>Edit</button><button onClick={()=>{ if(cloudOn) cloudToggle(e); else update(s=>{const emp=s.employees.find(x=>x.id===e.id); emp.active=!emp.active;}); }} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>{e.active?'Deactivate':'Reactivate'}</button>{cloudOn && cloudRole!=='employee' && <button onClick={()=>cloudInvite(e)} style={{background:'#4C8577',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer'}}>✉ Invite</button>}<button onClick={()=>{ if(cloudOn) cloudRemove(e); else { if(confirm('Remove this teammate?')) update(s=>{s.employees=s.employees.filter(x=>x.id!==e.id);}); showToast('Removed'); } }} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.5)',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#E2735B'}}>Remove</button></div></div>;
       })}</div>
     }
   </>);
@@ -928,14 +1015,23 @@ function RunPayroll({state,update,setCurrentTab,showToast}){
       <div style={{fontSize:11,color:'rgba(32,21,38,0.55)',marginTop:6}}>Edit bank/account in Team → Edit. Pays to listed accounts.</div>
     </div>
     <div style={{display:'flex',gap:10,marginTop:16,flexWrap:'wrap'}}>
-      <button className="btn btn-primary" onClick={()=>{
-        update(s=>{
-          const lines2=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross, bank:e.bank, account:e.account, ...d}; });
-          s.runs.push({id:uid(),period,createdAt:new Date().toISOString(),lines:lines2,status:'paid'});
-        });
-        showToast(`Payroll for ${periodLabel(period)} confirmed — works offline too`);
+      <button className="btn btn-primary" onClick={async ()=>{
+        if(getApiBase() && getToken()){
+          try{
+            const run=await PayrollAPI.run();
+            const local=cloudRunToLocal(run);
+            update(s=>{ s.runs.push(local); });
+            showToast(`Payroll for ${periodLabel(local.period)} confirmed — server-computed ✓`);
+          }catch(err){ showToast('Cloud payroll failed: '+err.message); return; }
+        } else {
+          update(s=>{
+            const lines2=active.map(e=>{ const d=estimateDeductions(e.gross); return {employeeId:e.id,name:e.name,role:e.role,gross:e.gross, bank:e.bank, account:e.account, ...d}; });
+            s.runs.push({id:uid(),period,createdAt:new Date().toISOString(),lines:lines2,status:'paid'});
+          });
+          showToast(`Payroll for ${periodLabel(period)} confirmed — works offline too`);
+        }
         setCurrentTab('history');
-      }}>Confirm & pay {periodLabel(period)}</button>
+      }}>Confirm & pay {periodLabel(period)}{getApiBase() && getToken()?' ☁':''}</button>
       <button className="btn" style={{background:'#EDEEF2',color:'#201526'}} onClick={()=>printSchedule({companyName: state.companyName, period, lines: scheduleLines})}>🖨 Print payment schedule for Finance/CEO</button>
     </div>
   </>);
@@ -1101,6 +1197,48 @@ function CourseView({tr, state, update, showToast, close}){
     <div style={{marginTop:12,textAlign:'right'}}><button onClick={close} style={{background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Close</button></div>
   </>;
 }
+function AuthScreen({authForm,setAuthForm,onAuth,showToast}){
+  const [busy,setBusy]=useState(false);
+  const f=authForm;
+  async function submit(e){
+    e.preventDefault();
+    setBusy(true);
+    try{
+      if(f.mode==='signup'){
+        if(!f.companyName||!f.name||!f.email||f.password.length<8){ showToast('Fill company, name, valid email, password 8+ chars'); setBusy(false); return; }
+        const r=await AuthAPI.signup({companyName:f.companyName,name:f.name,email:f.email,password:f.password});
+        setSession(r.token,r.user); showToast('Company created — welcome ✓'); onAuth();
+      } else {
+        if(!f.email||!f.password){ showToast('Enter email + password'); setBusy(false); return; }
+        const r=await AuthAPI.login({email:f.email,password:f.password});
+        setSession(r.token,r.user); showToast(`Welcome back, ${r.user.name} ✓`); onAuth();
+      }
+    }catch(err){ showToast(err.message||'Login failed'); }
+    setBusy(false);
+  }
+  return (
+    <div style={{minHeight:'100vh', background:'#241623', color:'#EDEEF2', display:'flex', alignItems:'center', justifyContent:'center', padding:24}}>
+      <div style={{maxWidth:480, width:'100%', background:'#EDEEF2', color:'#201526', borderRadius:12, padding:32, boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}}>Roost Cloud</div><div style={{fontSize:12,opacity:0.6}}>Real login · Postgres · server payroll — {getApiBase()}</div></div></div>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {['login','signup'].map(m=><button key={m} onClick={()=>setAuthForm({...f,mode:m})} style={{flex:1,padding:'9px 0',borderRadius:6,border:'1px solid rgba(32,21,38,0.2)',background:f.mode===m?'#201526':'transparent',color:f.mode===m?'#fff':'#201526',fontSize:13,fontWeight:600,cursor:'pointer',textTransform:'capitalize'}}>{m==='login'?'Log in':'New company'}</button>)}
+        </div>
+        <form onSubmit={submit}>
+          {f.mode==='signup' && <><div className="field"><label>Company name</label><input value={f.companyName} onChange={e=>setAuthForm({...f,companyName:e.target.value})} placeholder="e.g. GreenField Ltd"/></div>
+          <div className="field"><label>Your name</label><input value={f.name} onChange={e=>setAuthForm({...f,name:e.target.value})} placeholder="e.g. Ada Obi"/></div></>}
+          <div className="field"><label>Email</label><input value={f.email} onChange={e=>setAuthForm({...f,email:e.target.value})} placeholder="you@company.com"/></div>
+          <div className="field"><label>Password (8+ chars)</label><input type="password" value={f.password} onChange={e=>setAuthForm({...f,password:e.target.value})}/></div>
+          <button type="submit" disabled={busy} className="btn btn-primary" style={{width:'100%',marginTop:4,padding:12,opacity:busy?0.6:1}}>{busy?'Please wait…':f.mode==='signup'?'Create company + owner login':'Log in'}</button>
+        </form>
+        <div style={{marginTop:14,display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button onClick={()=>{ localStorage.setItem(CLOUD_OFF_KEY,'1'); location.reload(); }} style={{fontSize:12,border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,background:'transparent',cursor:'pointer'}}>Continue offline (no cloud)</button>
+          <button onClick={()=>{ const u=prompt('Backend URL (empty = default from deploy):', localStorage.getItem('roost_api_base')||''); if(u!==null){ setApiBaseOverride(u.trim()); location.reload(); } }} style={{fontSize:12,border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,background:'transparent',cursor:'pointer'}}>Change backend URL</button>
+        </div>
+        <p style={{fontSize:11,opacity:0.55,marginTop:14}}>Each person logs in with their own email — employees only ever see their own payslip. Invite them from Team → Invite after logging in.</p>
+      </div>
+    </div>
+  );
+}
 function Modal({modal,setModal,state,update,showToast}){
   const [form,setForm]=useState(()=>{
     if(modal.type==='employee'){
@@ -1213,10 +1351,25 @@ function Modal({modal,setModal,state,update,showToast}){
           <div className="field"><label>Gross monthly salary (₦)</label><input type="number" value={form.gross} onChange={e=>setForm({...form,gross:e.target.value})}/></div>
           <div className="field-row"><div className="field"><label>Bank</label><input value={form.bank} onChange={e=>setForm({...form,bank:e.target.value})}/></div><div className="field"><label>Account</label><input value={form.account} onChange={e=>setForm({...form,account:e.target.value})}/></div></div>
           <div className="field-row"><div className="field"><label>Start date</label><input type="date" value={form.startDate} onChange={e=>setForm({...form,startDate:e.target.value})}/></div><div className="field"><label>DOB</label><input type="date" value={form.dob} onChange={e=>setForm({...form,dob:e.target.value})}/></div></div>
-          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={()=>{
+          <div style={{display:'flex',gap:10,marginTop:20}}><button className="btn btn-primary" onClick={async ()=>{
             if(!form.name||!form.role||!form.gross || Number(form.gross)<=0){ alert('Fill name, role, valid salary'); return; }
-            if(modal.data){ update(s=>{ Object.assign(s.employees.find(x=>x.id===modal.data),{name:form.name,role:form.role,gross:Number(form.gross),bank:form.bank,account:form.account,startDate:form.startDate,dob:form.dob});}); showToast('Teammate updated'); }
-            else { update(s=>{ s.employees.push({id:uid(),name:form.name,role:form.role,gross:Number(form.gross),bank:form.bank,account:form.account,startDate:form.startDate,dob:form.dob,active:true,color:AVATAR_COLORS[s.employees.length%AVATAR_COLORS.length], nin:'',payeTin:'',nhfNumber:'',pensionPin:'',nsitfNumber:'', documents: Object.fromEntries(DOC_TYPES.map(dt=>[dt.key,null]))});}); showToast('Teammate added'); }
+            if(getApiBase() && getToken()){
+              try{
+                const payload={name:form.name,role:form.role,gross:Number(form.gross),bank:form.bank||'',account:form.account||'',startDate:form.startDate||'',dob:form.dob||''};
+                if(modal.data){
+                  const r=await EmployeesAPI.update(modal.data,payload);
+                  update(s=>{ const ex=s.employees.find(x=>x.id===modal.data); if(ex) Object.assign(ex,{name:r.name,role:r.role,gross:r.gross,bank:r.bank||'',account:r.account||'',startDate:r.startDate||'',dob:r.dob||''}); });
+                  showToast('Teammate updated (cloud) ✓');
+                } else {
+                  const r=await EmployeesAPI.create(payload);
+                  update(s=>{ const m=cloudEmployeeToLocal(r,s.employees.length); if(s.orgUnits&&s.orgUnits.length) m.department=s.orgUnits[s.employees.length%s.orgUnits.length].id; s.employees.push(m); });
+                  showToast('Teammate added (cloud) ✓');
+                }
+              }catch(err){ showToast('Cloud save failed: '+err.message); return; }
+            } else {
+              if(modal.data){ update(s=>{ Object.assign(s.employees.find(x=>x.id===modal.data),{name:form.name,role:form.role,gross:Number(form.gross),bank:form.bank,account:form.account,startDate:form.startDate,dob:form.dob});}); showToast('Teammate updated'); }
+              else { update(s=>{ s.employees.push({id:uid(),name:form.name,role:form.role,gross:Number(form.gross),bank:form.bank,account:form.account,startDate:form.startDate,dob:form.dob,active:true,color:AVATAR_COLORS[s.employees.length%AVATAR_COLORS.length], nin:'',payeTin:'',nhfNumber:'',pensionPin:'',nsitfNumber:'',passportPhoto:null, documents: Object.fromEntries(DOC_TYPES.map(dt=>[dt.key,null]))});}); showToast('Teammate added'); }
+            }
             close();
           }}>{modal.data?'Save changes':'Add teammate'}</button><button className="btn" style={{background:'transparent',border:'1px solid rgba(32,21,38,0.25)'}} onClick={close}>Cancel</button></div>
         </>}
