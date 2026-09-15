@@ -40,8 +40,19 @@ function initials(name){ return name.trim().split(' ').map(n=>n[0]).slice(0,2).j
 function money(n){ return '₦' + Math.round(n).toLocaleString('en-NG'); }
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
+// PAYE per the (pre-2026) Personal Income Tax Act graduated bands, applied to
+// income AFTER the Consolidated Relief Allowance and pension are deducted —
+// the previous version taxed a flat (annual - 300,000) with no CRA and no
+// pension relief, which overstates tax owed for nearly every salary level.
+//
+// IMPORTANT: Nigeria's tax rules changed under the Tax Reform Act effective
+// Jan 2026. Verify current bands/reliefs with FIRS or an accountant before
+// relying on this for real payslips or statutory filings — do not treat
+// this function as compliance-certified as-is.
 function estimateDeductions(gross){
   const annual = gross*12;
+  // Consolidated Relief Allowance: higher of ₦200,000 or 1% of gross income,
+  // plus 20% of gross income.
   const cra = Math.max(200000, annual*0.01) + annual*0.20;
   const pensionEmployeeAnnual = annual*0.08;
   const pensionEmployerAnnual = annual*0.10;
