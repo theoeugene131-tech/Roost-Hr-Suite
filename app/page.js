@@ -42,13 +42,16 @@ function uid(){ return Math.random().toString(36).slice(2,9); }
 function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
 function estimateDeductions(gross){
   const annual = gross*12;
-  let taxable = Math.max(annual - 300000, 0);
+  const cra = Math.max(200000, annual*0.01) + annual*0.20;
+  const pensionEmployeeAnnual = annual*0.08;
+  const pensionEmployerAnnual = annual*0.10;
+  const taxable = Math.max(annual - cra - pensionEmployeeAnnual, 0);
   const bands = [[300000,0.07],[300000,0.11],[500000,0.15],[500000,0.19],[1600000,0.21],[Infinity,0.24]];
   let tax=0, remaining=taxable;
-  for(const [s,rate] of bands){ if(remaining<=0) break; const amt=Math.min(s,remaining); tax+=amt*rate; remaining-=amt; }
+  for(const [size,rate] of bands){ if(remaining<=0) break; const amt=Math.min(size,remaining); tax+=amt*rate; remaining-=amt; }
   const monthlyPAYE=Math.round(tax/12);
-  const pensionEmployee=Math.round(gross*0.08);
-  const pensionEmployer=Math.round(gross*0.10);
+  const pensionEmployee=Math.round(pensionEmployeeAnnual/12);
+  const pensionEmployer=Math.round(pensionEmployerAnnual/12);
   const nhf=Math.round(gross*0.025);
   const nsitf=Math.round(gross*0.01);
   const net=gross-monthlyPAYE-pensionEmployee-nhf;
