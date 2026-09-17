@@ -1,0 +1,61 @@
+name: Deploy Roost Pro to Vercel
+
+on:
+  push:
+    branches: [pro]
+  pull_request:
+    branches: [pro]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://roost-pro.vercel.app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd roost
+          npm ci
+
+      - name: Build
+        run: |
+          cd roost
+          npm run build
+
+      - name: Install Vercel CLI
+        run: |
+          npm i -g vercel@latest
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: |
+          cd roost
+          vercel --prod --scope theoeugene131-tech \
+            -e NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}"
+
+      - name: Notify deployment success
+        if: always()
+        run: |
+          echo "✅ Roost Pro deployed to Vercel"
+          echo "Environment: production"
+          echo "Branch: pro"
+          echo "URL: https://roost-pro.vercel.app"
