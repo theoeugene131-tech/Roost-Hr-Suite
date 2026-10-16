@@ -1,7 +1,7 @@
 {
-  "name": "Roost — Payroll, HR & Compliance",
-  "short_name": "Roost",
-  "description": "HR, Payroll & Compliance for small teams (5-20). Works online and offline.",
+  "name": "Medash HR Suite — Human Resources & Payroll",
+  "short_name": "Medash HR",
+  "description": "HR management for teams across Nigeria, the United Kingdom and the United States.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#241623",
