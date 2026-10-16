@@ -1,7 +1,12 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+// Never allow production to start with a publicly guessable JWT signing key.
+const configuredSecret = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === "production" && (!configuredSecret || configuredSecret.length < 32)) {
+  throw new Error("JWT_SECRET must be set to a random value of at least 32 characters in production.");
+}
+const JWT_SECRET = configuredSecret || "development-only-secret-do-not-use-in-production";
 const TOKEN_TTL = "14d";
 
 export async function hashPassword(password: string) {
