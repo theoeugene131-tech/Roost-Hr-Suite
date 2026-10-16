@@ -13,6 +13,7 @@ const defaults: Record<string, any> = {
 };
 
 const settingsSchema = z.object({
+  companyName: z.string().trim().min(2).max(160),
   country: z.enum(["NG", "US", "GB"]),
   region: z.string().max(100).optional().default(""),
   currency: z.string().regex(/^[A-Z]{3}$/).optional(),
@@ -25,8 +26,12 @@ const settingsSchema = z.object({
 
 companySettingsRouter.get("/", async (req: AuthedRequest, res) => {
   const companyId = req.auth!.companyId;
-  const saved = await db.findForCompany("companySettings", companyId, companyId);
-  res.json(saved || {
+  const [saved, company] = await Promise.all([
+    db.findForCompany("companySettings", companyId, companyId),
+    db.find("companies", companyId),
+  ]);
+  res.json({
+    ...(saved || {
     id: companyId,
     companyId,
     ...defaults.NG,
@@ -34,6 +39,8 @@ companySettingsRouter.get("/", async (req: AuthedRequest, res) => {
     workWeek: [1, 2, 3, 4, 5],
     financialYearStartMonth: 1,
     leavePolicies: {},
+    }),
+    companyName: company?.name || saved?.companyName || "",
   });
 });
 
@@ -43,6 +50,7 @@ companySettingsRouter.put("/", requireAdmin, async (req: AuthedRequest, res) => 
 
   const companyId = req.auth!.companyId;
   const selected = defaults[parsed.data.country];
+  await db.update("companies", companyId, { name: parsed.data.companyName });
   const settings = {
     id: companyId,
     companyId,
