@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { loadState, saveState } from "@/lib/store";
 import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense } from "@/lib/license";
-import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
+import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, CompanySettingsAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
+import { COUNTRY_CONFIG } from "@/lib/country-config";
 
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -24,12 +25,12 @@ const DOC_TYPES = [
 ];
 const TAB_LABELS = {
   overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', training:'Training', leave:'Leave', attendance:'Attendance', org:'Org Chart', runpayroll:'Run payroll', history:'History',
-  compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile'
+  compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile', settings:'Company settings'
 };
 function visibleTabs(role){
   if(role==='employee') return ['myprofile','training','leave','attendance'];
-  if(role==='admin') return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring'];
-  return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','reports'];
+  if(role==='admin') return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','settings'];
+  return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','reports','settings'];
 }
 const LEAVE_TYPES = [
   {key:'annual', label:'Annual Leave', days:21, color:'#4C8577'},
@@ -102,6 +103,7 @@ function complianceStatus(state, period, item){
 function migrateState(s){
   let changed=false;
   if(!s.companyName){ s.companyName=''; changed=true; }
+  if(!s.companySettings){ s.companySettings={country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}}; changed=true; }
   if(!s.trainings || s.trainings.length===0){ 
     const fresh=seedDemo(); s.trainings=fresh.trainings; s.enrollments=fresh.enrollments; s.certificates=fresh.certificates; changed=true;
   }
@@ -289,7 +291,7 @@ export default function Page(){
     if(me) setApiUser(me);
     setCloudLoading(true);
     try{
-      const [emps,runs]=await Promise.all([EmployeesAPI.list().catch(()=>null), PayrollAPI.list().catch(()=>null)]);
+      const [emps,runs,settings]=await Promise.all([EmployeesAPI.list().catch(()=>null), PayrollAPI.list().catch(()=>null), CompanySettingsAPI.get().catch(()=>null)]);
       setState(s=>{
         if(!s) return s;
         const ns=JSON.parse(JSON.stringify(s));
@@ -308,6 +310,7 @@ export default function Page(){
             });
           }
         }
+        if(settings && typeof settings==='object') ns.companySettings={...ns.companySettings,...settings};
         if(Array.isArray(runs)){
           if(me && me.role==='employee'){
             ns.runs=runs.map((r,i)=>({ id:'cloud-'+r.period+'-'+i, period:r.period, createdAt:r.createdAt, lines:r.line?[{...r.line,bank:r.line.bank||'',account:r.line.account||'',nsitf:Math.round((r.line.gross||0)*0.01)}]:[], status:'paid' }));
@@ -321,7 +324,7 @@ export default function Page(){
   useEffect(()=>{
     let loaded=loadState();
     if(loaded){ loaded=migrateState(loaded); setState(loaded); }
-    else { const s=seedDemo(); setState(s); saveState(s); }
+    else { const s=migrateState(seedDemo()); setState(s); saveState(s); }
     // Cloud backend (opt-in): hydrate employees + payroll when configured + logged in
     try{ if(getApiBase() && !cloudOff() && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
     const updateOnline=()=>setOnline(navigator.onLine);
@@ -510,6 +513,7 @@ export default function Page(){
         {currentTab==='hiring' && <Hiring state={state} update={update} setModal={setModal} showToast={showToast} />}
         {currentTab==='reports' && <Reports state={state} />}
         {currentTab==='myprofile' && <MyProfile state={state} />}
+        {currentTab==='settings' && <CompanySettings state={state} update={update} cloudMode={cloudMode} showToast={showToast} />}
       </main>
       <footer style={{borderTop:'1px solid var(--line)',padding:'16px 40px',textAlign:'center',fontSize:12,color:'var(--muted)',background:'rgba(0,0,0,0.15)'}}>
         Developed by <span style={{color:'var(--paper)',fontWeight:600}}>Next Level Global</span> · Contact <a href="https://wa.me/2348026892077" target="_blank" rel="noopener noreferrer" style={{color:'#25D366',textDecoration:'none',fontWeight:600}}>WhatsApp +234 802 689 2077</a> · Roost works offline
@@ -519,6 +523,51 @@ export default function Page(){
     </>
   );
 }
+
+
+function CompanySettings({state,update,cloudMode,showToast}){
+  const saved=state.companySettings||{country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}};
+  const [form,setForm]=useState(saved);
+  const [busy,setBusy]=useState(false);
+  function changeCountry(country){
+    const preset=COUNTRY_CONFIG[country]||COUNTRY_CONFIG.NG;
+    setForm(f=>({...f,country,currency:preset.currency,locale:preset.locale,timezone:preset.timezone}));
+  }
+  async function save(e){
+    e.preventDefault();
+    setBusy(true);
+    try{
+      let next={...form,workWeek:[...(form.workWeek||[])]};
+      if(cloudMode) next=await CompanySettingsAPI.update(next);
+      update(s=>{s.companySettings=next;});
+      try{localStorage.setItem('roost_country_settings',JSON.stringify(next));}catch{}
+      showToast(cloudMode?'Company settings saved securely ✓':'Settings saved on this device only');
+    }catch(err){
+      showToast(err.message||'Could not save company settings');
+    }finally{setBusy(false);}
+  }
+  const field={width:'100%',padding:'10px 12px',borderRadius:6,border:'1px solid rgba(32,21,38,0.2)',background:'#fff',color:'#201526',fontSize:13};
+  return <div style={{maxWidth:820}}>
+    <div className="panel-head"><div><h2>Company settings</h2><p style={{fontSize:12.5,color:'var(--muted)',marginTop:5}}>Set your company's country and regional defaults.</p></div></div>
+    {!cloudMode && <div style={{padding:12,marginBottom:16,border:'1px solid rgba(226,115,91,0.5)',borderRadius:8,color:'var(--paper)',fontSize:12.5}}>Offline/local mode: these settings are saved on this device only. Connect the authenticated cloud backend to save settings to the company account.</div>}
+    <form onSubmit={save} style={{background:'var(--paper)',color:'var(--ink)',borderRadius:8,padding:22}}>
+      <div className="field"><label>Company country</label><select value={form.country||'NG'} onChange={e=>changeCountry(e.target.value)} style={field}><option value="NG">Nigeria</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></div>
+      <div className="field-row">
+        <div className="field"><label>State / region</label><input style={field} value={form.region||''} onChange={e=>setForm(f=>({...f,region:e.target.value}))} placeholder="e.g. Lagos, California, Scotland"/></div>
+        <div className="field"><label>Currency (ISO code)</label><input style={field} maxLength={3} value={form.currency||''} onChange={e=>setForm(f=>({...f,currency:e.target.value.toUpperCase()}))} placeholder="NGN / USD / GBP" required/></div>
+      </div>
+      <div className="field-row">
+        <div className="field"><label>Locale</label><input style={field} value={form.locale||''} onChange={e=>setForm(f=>({...f,locale:e.target.value}))} placeholder="en-GB" required/></div>
+        <div className="field"><label>Timezone (IANA)</label><input style={field} value={form.timezone||''} onChange={e=>setForm(f=>({...f,timezone:e.target.value}))} placeholder="Europe/London" required/></div>
+      </div>
+      <div className="field"><label>Financial year starts in</label><select style={field} value={form.financialYearStartMonth||1} onChange={e=>setForm(f=>({...f,financialYearStartMonth:Number(e.target.value)}))}>{MONTHS.map((m,i)=><option key={m} value={i+1}>{m}</option>)}</select></div>
+      <div className="field"><label>Working days</label><div style={{display:'flex',gap:12,flexWrap:'wrap'}}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((day,i)=><label key={day} style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}><input type="checkbox" checked={(form.workWeek||[]).includes(i)} onChange={e=>setForm(f=>({...f,workWeek:e.target.checked?[...(f.workWeek||[]),i].filter((v,j,a)=>a.indexOf(v)===j):(f.workWeek||[]).filter(v=>v!==i)}))}/>{day}</label>)}</div></div>
+      <div style={{fontSize:12,color:'#5A5260',marginBottom:16}}>Payroll status: {COUNTRY_CONFIG[form.country||'NG']?.payrollStatus==='not-implemented'?'Country-specific payroll is not implemented yet. Do not use Nigerian calculations for this country.':'Existing Nigerian estimator needs current-rule validation before statutory use.'}</div>
+      <button className="btn btn-primary" type="submit" disabled={busy || !(form.workWeek||[]).length}>{busy?'Saving…':'Save company settings'}</button>
+    </form>
+  </div>;
+}
+
 
 function Overview({state,setModal}){
   const lastRun=state.runs[state.runs.length-1];
