@@ -322,11 +322,23 @@ export default function Page(){
   }
 
   useEffect(()=>{
-    let loaded=loadState();
-    if(loaded){ loaded=migrateState(loaded); setState(loaded); }
-    else { const s=migrateState(seedDemo()); setState(s); saveState(s); }
-    // Cloud backend (opt-in): hydrate employees + payroll when configured + logged in
-    try{ if(getApiBase() && !cloudOff() && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
+    const cloudConfigured=!!getApiBase() && !cloudOff();
+    if(cloudConfigured){
+      // Never hydrate another account's browser-local demo/cache into cloud mode.
+      // Until each HR module has a server API, cloud mode starts with an empty shell.
+      const shell=seedDemo();
+      shell.companyName='';
+      shell.employees=[]; shell.runs=[]; shell.compliance={}; shell.reviews=[]; shell.candidates=[];
+      shell.trainings=[]; shell.enrollments=[]; shell.certificates=[]; shell.leaves=[]; shell.attendance=[]; shell.orgUnits=[];
+      shell.companySettings={country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}};
+      setState(shell);
+    } else {
+      let loaded=loadState();
+      if(loaded){ loaded=migrateState(loaded); setState(loaded); }
+      else { const s=migrateState(seedDemo()); setState(s); saveState(s); }
+    }
+    // Cloud backend (opt-in): hydrate only server-backed data for this account.
+    try{ if(cloudConfigured && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
     const updateOnline=()=>setOnline(navigator.onLine);
     updateOnline();
     window.addEventListener('online',updateOnline);
@@ -349,7 +361,7 @@ export default function Page(){
     }
     return ()=>{ window.removeEventListener('online',updateOnline); window.removeEventListener('offline',updateOnline); };
   },[]);
-  useEffect(()=>{ if(state) saveState(state); },[state]);
+  useEffect(()=>{ if(state && !(getApiBase() && !cloudOff())) saveState(state); },[state]);
   useEffect(()=>{ if(!online) setToast("You are offline — changes will sync when you reconnect."); else if(toast && toast.includes("offline")) setToast("Back online ✓"); },[online]);
 
   if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost…</div>;
@@ -529,6 +541,7 @@ function CompanySettings({state,update,cloudMode,showToast}){
   const saved=state.companySettings||{country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}};
   const [form,setForm]=useState(saved);
   const [busy,setBusy]=useState(false);
+  useEffect(()=>{ setForm(saved); },[state.companySettings]);
   function changeCountry(country){
     const preset=COUNTRY_CONFIG[country]||COUNTRY_CONFIG.NG;
     setForm(f=>({...f,country,currency:preset.currency,locale:preset.locale,timezone:preset.timezone}));
