@@ -1,17 +1,17 @@
 import crypto from "crypto";
 
 /**
- * Field-level encryption for sensitive employee data (bank account numbers,
- * NIN, PAYE TIN, pension PIN, NSITF number). The old frontend-only version
- * stored all of this as plain text in the browser's localStorage — this
- * encrypts it at rest in Postgres instead.
- *
- * Set ENCRYPTION_KEY in .env to a 32-byte random value, e.g.:
- *   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ * AES-256-GCM field-level encryption for sensitive employee identifiers and
+ * bank account numbers. ENCRYPTION_KEY must remain stable across deployments.
+ * Configure it as 64 hex characters representing 32 random bytes.
  */
-const KEY = process.env.ENCRYPTION_KEY
-  ? Buffer.from(process.env.ENCRYPTION_KEY, "hex")
-  : crypto.randomBytes(32); // dev fallback — set a real key in production, or data won't decrypt across restarts
+const rawKey = process.env.ENCRYPTION_KEY;
+if (process.env.NODE_ENV === "production" && (!rawKey || !/^[0-9a-fA-F]{64}$/.test(rawKey))) {
+  throw new Error("ENCRYPTION_KEY must be configured as 64 hexadecimal characters in production");
+}
+const KEY = rawKey && /^[0-9a-fA-F]{64}$/.test(rawKey)
+  ? Buffer.from(rawKey, "hex")
+  : crypto.createHash("sha256").update("local-development-only-change-me").digest();
 
 export function encryptField(plain: string | null | undefined): string | null {
   if (plain === null || plain === undefined || plain === "") return null;
@@ -25,6 +25,7 @@ export function encryptField(plain: string | null | undefined): string | null {
 export function decryptField(blob: string | null | undefined): string {
   if (!blob) return "";
   const buf = Buffer.from(blob, "base64");
+  if (buf.length < 28) throw new Error("Invalid encrypted field payload");
   const iv = buf.subarray(0, 12);
   const authTag = buf.subarray(12, 28);
   const encrypted = buf.subarray(28);
