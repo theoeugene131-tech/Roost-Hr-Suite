@@ -5,7 +5,7 @@
   "description": "Roost — Payroll, HR & Compliance for small teams (offline-first)",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm --prefix backend install --include=dev && npm --prefix backend run build && next build",
     "start": "next start",
     "lint": "next lint"
   },
