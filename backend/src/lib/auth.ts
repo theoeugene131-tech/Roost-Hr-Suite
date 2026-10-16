@@ -1,11 +1,15 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+const configuredSecret = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === "production" && (!configuredSecret || configuredSecret.length < 32)) {
+  throw new Error("JWT_SECRET must be configured with at least 32 characters in production");
+}
+const JWT_SECRET = configuredSecret || "local-development-only-change-me";
 const TOKEN_TTL = "14d";
 
 export async function hashPassword(password: string) {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 12);
 }
 
 export async function verifyPassword(password: string, hash: string) {
@@ -16,7 +20,7 @@ export interface TokenPayload {
   userId: string;
   companyId: string;
   role: "owner" | "admin" | "employee";
-  employeeId: string | null; // set when role === "employee" — links login to their payroll record
+  employeeId: string | null;
 }
 
 export function signToken(payload: TokenPayload) {
