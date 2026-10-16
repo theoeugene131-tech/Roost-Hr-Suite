@@ -310,7 +310,7 @@ export default function Page(){
             });
           }
         }
-        if(settings && typeof settings==='object') ns.companySettings={...ns.companySettings,...settings};
+        if(settings && typeof settings==='object'){ ns.companySettings={...ns.companySettings,...settings}; if(settings.companyName) ns.companyName=settings.companyName; }
         if(Array.isArray(runs)){
           if(me && me.role==='employee'){
             ns.runs=runs.map((r,i)=>({ id:'cloud-'+r.period+'-'+i, period:r.period, createdAt:r.createdAt, lines:r.line?[{...r.line,bank:r.line.bank||'',account:r.line.account||'',nsitf:Math.round((r.line.gross||0)*0.01)}]:[], status:'paid' }));
