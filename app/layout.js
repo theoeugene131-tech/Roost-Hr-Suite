@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Roost — Payroll for Small Teams | Next Level Global",
-  description: "HR, Payroll & Compliance for teams of 5-20. Works online and offline. Developed by Next Level Global — WhatsApp +2348026892077",
+  title: "Medash HR Suite | Human Resources & Payroll",
+  description: "Medash HR Suite — HR management for teams across Nigeria, the United Kingdom and the United States. Country-specific payroll features are subject to implementation and validation.",
   manifest: "/manifest.json",
   themeColor: "#241623",
 };
