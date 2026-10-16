@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { loadState, saveState } from "@/lib/store";
 import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense } from "@/lib/license";
-import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
+import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, CompanySettingsAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
+import { COUNTRY_CONFIG } from "@/lib/country-config";
 
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -24,12 +25,12 @@ const DOC_TYPES = [
 ];
 const TAB_LABELS = {
   overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', training:'Training', leave:'Leave', attendance:'Attendance', org:'Org Chart', runpayroll:'Run payroll', history:'History',
-  compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile'
+  compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile', settings:'Company settings'
 };
 function visibleTabs(role){
   if(role==='employee') return ['myprofile','training','leave','attendance'];
-  if(role==='admin') return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring'];
-  return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','reports'];
+  if(role==='admin') return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','settings'];
+  return ['overview','team','docs','regulatory','training','leave','attendance','org','runpayroll','history','compliance','reviews','hiring','reports','settings'];
 }
 const LEAVE_TYPES = [
   {key:'annual', label:'Annual Leave', days:21, color:'#4C8577'},
@@ -38,7 +39,14 @@ const LEAVE_TYPES = [
   {key:'maternity', label:'Maternity/Paternity', days:84, color:'#7D6BA6'},
 ];
 function initials(name){ return name.trim().split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase(); }
-function money(n){ return '₦' + Math.round(n).toLocaleString('en-NG'); }
+function money(n){
+  let settings={country:'NG',currency:'NGN',locale:'en-NG'};
+  if(typeof window!=='undefined'){
+    try{ settings={...settings,...JSON.parse(localStorage.getItem('roost_country_settings')||'{}')}; }catch{}
+  }
+  const currency=settings.currency||({NG:'NGN',US:'USD',GB:'GBP'}[settings.country]||'NGN');
+  return new Intl.NumberFormat(settings.locale||'en-NG',{style:'currency',currency,maximumFractionDigits:0}).format(Math.round(Number(n)||0));
+}
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
 // PAYE per the (pre-2026) Personal Income Tax Act graduated bands, applied to
@@ -102,6 +110,7 @@ function complianceStatus(state, period, item){
 function migrateState(s){
   let changed=false;
   if(!s.companyName){ s.companyName=''; changed=true; }
+  if(!s.companySettings){ s.companySettings={country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}}; changed=true; }
   if(!s.trainings || s.trainings.length===0){ 
     const fresh=seedDemo(); s.trainings=fresh.trainings; s.enrollments=fresh.enrollments; s.certificates=fresh.certificates; changed=true;
   }
@@ -289,7 +298,7 @@ export default function Page(){
     if(me) setApiUser(me);
     setCloudLoading(true);
     try{
-      const [emps,runs]=await Promise.all([EmployeesAPI.list().catch(()=>null), PayrollAPI.list().catch(()=>null)]);
+      const [emps,runs,settings]=await Promise.all([EmployeesAPI.list().catch(()=>null), PayrollAPI.list().catch(()=>null), CompanySettingsAPI.get().catch(()=>null)]);
       setState(s=>{
         if(!s) return s;
         const ns=JSON.parse(JSON.stringify(s));
@@ -308,6 +317,7 @@ export default function Page(){
             });
           }
         }
+        if(settings && typeof settings==='object'){ ns.companySettings={...ns.companySettings,...settings}; if(settings.companyName) ns.companyName=settings.companyName; }
         if(Array.isArray(runs)){
           if(me && me.role==='employee'){
             ns.runs=runs.map((r,i)=>({ id:'cloud-'+r.period+'-'+i, period:r.period, createdAt:r.createdAt, lines:r.line?[{...r.line,bank:r.line.bank||'',account:r.line.account||'',nsitf:Math.round((r.line.gross||0)*0.01)}]:[], status:'paid' }));
@@ -319,11 +329,23 @@ export default function Page(){
   }
 
   useEffect(()=>{
-    let loaded=loadState();
-    if(loaded){ loaded=migrateState(loaded); setState(loaded); }
-    else { const s=seedDemo(); setState(s); saveState(s); }
-    // Cloud backend (opt-in): hydrate employees + payroll when configured + logged in
-    try{ if(getApiBase() && !cloudOff() && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
+    const cloudConfigured=!!getApiBase() && !cloudOff();
+    if(cloudConfigured){
+      // Never hydrate another account's browser-local demo/cache into cloud mode.
+      // Until each HR module has a server API, cloud mode starts with an empty shell.
+      const shell=seedDemo();
+      shell.companyName='';
+      shell.employees=[]; shell.runs=[]; shell.compliance={}; shell.reviews=[]; shell.candidates=[];
+      shell.trainings=[]; shell.enrollments=[]; shell.certificates=[]; shell.leaves=[]; shell.attendance=[]; shell.orgUnits=[];
+      shell.companySettings={country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}};
+      setState(shell);
+    } else {
+      let loaded=loadState();
+      if(loaded){ loaded=migrateState(loaded); setState(loaded); }
+      else { const s=migrateState(seedDemo()); setState(s); saveState(s); }
+    }
+    // Cloud backend (opt-in): hydrate only server-backed data for this account.
+    try{ if(cloudConfigured && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
     const updateOnline=()=>setOnline(navigator.onLine);
     updateOnline();
     window.addEventListener('online',updateOnline);
@@ -346,7 +368,8 @@ export default function Page(){
     }
     return ()=>{ window.removeEventListener('online',updateOnline); window.removeEventListener('offline',updateOnline); };
   },[]);
-  useEffect(()=>{ if(state) saveState(state); },[state]);
+  useEffect(()=>{ if(state && !(getApiBase() && !cloudOff())) saveState(state); },[state]);
+  useEffect(()=>{ if(state?.companySettings && typeof window!=='undefined'){ try{localStorage.setItem('roost_country_settings',JSON.stringify(state.companySettings));}catch{} } },[state?.companySettings]);
   useEffect(()=>{ if(!online) setToast("You are offline — changes will sync when you reconnect."); else if(toast && toast.includes("offline")) setToast("Back online ✓"); },[online]);
 
   if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost…</div>;
@@ -386,7 +409,8 @@ export default function Page(){
   }
   const cloudBase=getApiBase();
   const cloudMode=!!(cloudBase && !cloudOff() && apiUser && getToken());
-  const tabs=visibleTabs(cloudMode && apiUser.role==='employee' ? 'employee' : state.currentRole);
+  const roleTabs=visibleTabs(cloudMode && apiUser.role==='employee' ? 'employee' : state.currentRole);
+  const tabs=state.companySettings?.country && state.companySettings.country!=='NG' ? roleTabs.filter(t=>!['regulatory','runpayroll','history','compliance'].includes(t)) : roleTabs;
   const activeTabs=tabs.includes(currentTab)?currentTab:tabs[0];
   if(activeTabs!==currentTab) setCurrentTab(activeTabs);
   function update(fn){ setState(s=>{ const ns=JSON.parse(JSON.stringify(s)); fn(ns); return ns; }); }
@@ -510,6 +534,7 @@ export default function Page(){
         {currentTab==='hiring' && <Hiring state={state} update={update} setModal={setModal} showToast={showToast} />}
         {currentTab==='reports' && <Reports state={state} />}
         {currentTab==='myprofile' && <MyProfile state={state} />}
+        {currentTab==='settings' && <CompanySettings state={state} update={update} cloudMode={cloudMode} showToast={showToast} />}
       </main>
       <footer style={{borderTop:'1px solid var(--line)',padding:'16px 40px',textAlign:'center',fontSize:12,color:'var(--muted)',background:'rgba(0,0,0,0.15)'}}>
         Developed by <span style={{color:'var(--paper)',fontWeight:600}}>Next Level Global</span> · Contact <a href="https://wa.me/2348026892077" target="_blank" rel="noopener noreferrer" style={{color:'#25D366',textDecoration:'none',fontWeight:600}}>WhatsApp +234 802 689 2077</a> · Roost works offline
@@ -520,8 +545,56 @@ export default function Page(){
   );
 }
 
+
+function CompanySettings({state,update,cloudMode,showToast}){
+  const saved={companyName:state.companyName||'',...(state.companySettings||{country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}})};
+  const [form,setForm]=useState(saved);
+  const [busy,setBusy]=useState(false);
+  useEffect(()=>{ setForm(saved); },[state.companySettings]);
+  function changeCountry(country){
+    const preset=COUNTRY_CONFIG[country]||COUNTRY_CONFIG.NG;
+    setForm(f=>({...f,country,currency:preset.currency,locale:preset.locale,timezone:preset.timezone}));
+  }
+  async function save(e){
+    e.preventDefault();
+    setBusy(true);
+    try{
+      let next={...form,workWeek:[...(form.workWeek||[])]};
+      if(cloudMode) next=await CompanySettingsAPI.update(next);
+      update(s=>{s.companySettings=next;s.companyName=next.companyName||s.companyName;});
+      try{localStorage.setItem('roost_country_settings',JSON.stringify(next));}catch{}
+      showToast(cloudMode?'Company settings saved securely ✓':'Settings saved on this device only');
+    }catch(err){
+      showToast(err.message||'Could not save company settings');
+    }finally{setBusy(false);}
+  }
+  const field={width:'100%',padding:'10px 12px',borderRadius:6,border:'1px solid rgba(32,21,38,0.2)',background:'#fff',color:'#201526',fontSize:13};
+  return <div style={{maxWidth:820}}>
+    <div className="panel-head"><div><h2>Company settings</h2><p style={{fontSize:12.5,color:'var(--muted)',marginTop:5}}>Set your company&apos;s country and regional defaults.</p></div></div>
+    {!cloudMode && <div style={{padding:12,marginBottom:16,border:'1px solid rgba(226,115,91,0.5)',borderRadius:8,color:'var(--paper)',fontSize:12.5}}>Offline/local mode: these settings are saved on this device only. Connect the authenticated cloud backend to save settings to the company account.</div>}
+    <form onSubmit={save} style={{background:'var(--paper)',color:'var(--ink)',borderRadius:8,padding:22}}>
+      <div className="field"><label>Company name</label><input style={field} value={form.companyName||''} onChange={e=>setForm(f=>({...f,companyName:e.target.value}))} placeholder="Your registered business name" minLength={2} maxLength={160} required/></div>
+      <div className="field"><label>Company country</label><select value={form.country||'NG'} onChange={e=>changeCountry(e.target.value)} style={field}><option value="NG">Nigeria</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></div>
+      <div className="field-row">
+        <div className="field"><label>State / region</label><input style={field} value={form.region||''} onChange={e=>setForm(f=>({...f,region:e.target.value}))} placeholder="e.g. Lagos, California, Scotland"/></div>
+        <div className="field"><label>Currency (ISO code)</label><input style={field} maxLength={3} value={form.currency||''} onChange={e=>setForm(f=>({...f,currency:e.target.value.toUpperCase()}))} placeholder="NGN / USD / GBP" required/></div>
+      </div>
+      <div className="field-row">
+        <div className="field"><label>Locale</label><input style={field} value={form.locale||''} onChange={e=>setForm(f=>({...f,locale:e.target.value}))} placeholder="en-GB" required/></div>
+        <div className="field"><label>Timezone (IANA)</label><input style={field} value={form.timezone||''} onChange={e=>setForm(f=>({...f,timezone:e.target.value}))} placeholder="Europe/London" required/></div>
+      </div>
+      <div className="field"><label>Financial year starts in</label><select style={field} value={form.financialYearStartMonth||1} onChange={e=>setForm(f=>({...f,financialYearStartMonth:Number(e.target.value)}))}>{MONTHS.map((m,i)=><option key={m} value={i+1}>{m}</option>)}</select></div>
+      <div className="field"><label>Working days</label><div style={{display:'flex',gap:12,flexWrap:'wrap'}}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((day,i)=><label key={day} style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}><input type="checkbox" checked={(form.workWeek||[]).includes(i)} onChange={e=>setForm(f=>({...f,workWeek:e.target.checked?[...(f.workWeek||[]),i].filter((v,j,a)=>a.indexOf(v)===j):(f.workWeek||[]).filter(v=>v!==i)}))}/>{day}</label>)}</div></div>
+      <div style={{fontSize:12,color:'#5A5260',marginBottom:16}}>Payroll status: {COUNTRY_CONFIG[form.country||'NG']?.payrollStatus==='not-implemented'?'Country-specific payroll is not implemented yet. Do not use Nigerian calculations for this country.':'Existing Nigerian estimator needs current-rule validation before statutory use.'}</div>
+      <button className="btn btn-primary" type="submit" disabled={busy || !(form.workWeek||[]).length}>{busy?'Saving…':'Save company settings'}</button>
+    </form>
+  </div>;
+}
+
+
 function Overview({state,setModal}){
   const lastRun=state.runs[state.runs.length-1];
+  const isNigeria=(state.companySettings?.country||'NG')==='NG';
   const items=[{key:'paye',what:'PAYE remittance',agency:'State IRS'},{key:'pension',what:'Pension remittance',agency:'PenCom / PFA'},{key:'nhf',what:'NHF remittance',agency:'Federal Mortgage Bank'},{key:'nsitf',what:'NSITF contribution',agency:'NSITF'}];
   const celebs=(()=>{
     const today=new Date(); today.setHours(0,0,0,0);
@@ -540,7 +613,7 @@ function Overview({state,setModal}){
       <div style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:14}}><div style={{fontSize:10,letterSpacing:0.06+'em',textTransform:'uppercase',color:'var(--muted)'}}>Doc compliance</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{docCompletion}%</div><div style={{fontSize:11,color:'var(--muted)'}}>avg across team</div></div>
       <div style={{background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:14}}><div style={{fontSize:10,letterSpacing:0.06+'em',textTransform:'uppercase',color:'var(--muted)'}}>Staff with docs</div><div style={{fontFamily:'Newsreader',fontSize:22,fontWeight:600}}>{state.employees.filter(e=>DOC_TYPES.some(dt=>e.documents?.[dt.key])).length}/{state.employees.length}</div></div>
     </div>
-    <div className="panel-head"><div><h2>Compliance calendar</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Deadlines for most recent payroll run</p></div></div>
+    {isNigeria && <><div className="panel-head"><div><h2>Compliance calendar</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Deadlines for most recent payroll run</p></div></div>
     {!lastRun ? <div style={{color:'var(--muted)',textAlign:'center',padding:'30px 0'}}>Run your first payroll to start tracking compliance deadlines.</div> :
       <div style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:6,marginBottom:32}}>
         {items.map(it=>{
@@ -556,11 +629,12 @@ function Overview({state,setModal}){
         })}
       </div>
     }
+    </>}
     <div className="panel-head"><div><h2>Team roster</h2><p style={{fontSize:12.5,color:'var(--muted)'}}>Click name to view documents — {state.employees.filter(e=>e.active).length} active</p></div></div>
     <div className="grid">{state.employees.map(e=>{
       const d=estimateDeductions(e.gross);
       const progress=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
-      return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(32,21,38,0.15)'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}</div></div><div style={{fontSize:10,background:progress===100?'var(--teal)':progress>50?'var(--gold)':'rgba(226,115,91,0.2)',color:progress===100?'#fff':progress>50?'#fff':'#8C3B28',padding:'4px 6px',borderRadius:20,fontFamily:'IBM Plex Mono'}}>{progress}% docs</div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
+      return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(32,21,38,0.15)'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}</div></div><div style={{fontSize:10,background:progress===100?'var(--teal)':progress>50?'var(--gold)':'rgba(226,115,91,0.2)',color:progress===100?'#fff':progress>50?'#fff':'#8C3B28',padding:'4px 6px',borderRadius:20,fontFamily:'IBM Plex Mono'}}>{progress}% docs</div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div>{(state.companySettings?.country||'NG')==='NG' && <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>}
       <div style={{height:4,background:'rgba(32,21,38,0.1)',borderRadius:4,overflow:'hidden'}}><div style={{width:`${progress}%`,height:'100%',background:'var(--teal)'}} /></div>
       </div>;
     })}</div>
@@ -590,7 +664,7 @@ function Team({state,update,setModal,showToast}){
       <div className="grid">{state.employees.map(e=>{
         const d=estimateDeductions(e.gross);
         const progress=Math.round(100*DOC_TYPES.filter(dt=>e.documents?.[dt.key]).length/DOC_TYPES.length);
-        return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',color:'#201526',textDecoration:'underline'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}{e.active?'':' · inactive'} · {progress}% docs</div></div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross monthly</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>
+        return <div key={e.id} className={`card ${e.active?'':'inactive'}`}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Newsreader',fontWeight:600,color:'#fff',background:e.color,flexShrink:0}}>{e.passportPhoto ? <img src={e.passportPhoto} alt='' style={{width:'100%',height:'100%',objectFit:'cover'}}/> : initials(e.name)}</div><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14,cursor:'pointer',color:'#201526',textDecoration:'underline'}} onClick={()=>setModal({type:'staffDocs',data:e.id})}>{e.name}</div><div style={{fontSize:11,opacity:0.6}}>{e.role}{e.active?'':' · inactive'} · {progress}% docs</div></div></div><div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Gross monthly</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(e.gross)}</span></div>{(state.companySettings?.country||'NG')==='NG' && <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5}}><span style={{opacity:0.55}}>Net pay</span><span style={{fontFamily:'IBM Plex Mono',fontWeight:600}}>{money(d.net)}</span></div>}
         <div style={{display:'flex',gap:6,marginTop:2,flexWrap:'wrap'}}><button onClick={()=>setModal({type:'staffDocs',data:e.id})} style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer'}}>📄 Docs</button><button onClick={()=>setModal({type:'employee',data:e.id})} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>Edit</button><button onClick={()=>{ if(cloudOn) cloudToggle(e); else update(s=>{const emp=s.employees.find(x=>x.id===e.id); emp.active=!emp.active;}); }} style={{background:'#E0E2E8',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#201526'}}>{e.active?'Deactivate':'Reactivate'}</button>{cloudOn && cloudRole!=='employee' && <button onClick={()=>cloudInvite(e)} style={{background:'#4C8577',color:'#fff',border:'none',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer'}}>✉ Invite</button>}<button onClick={()=>{ if(cloudOn) cloudRemove(e); else { if(confirm('Remove this teammate?')) update(s=>{s.employees=s.employees.filter(x=>x.id!==e.id);}); showToast('Removed'); } }} style={{background:'transparent',border:'1px solid rgba(226,115,91,0.5)',borderRadius:5,padding:'6px 10px',fontSize:11.5,cursor:'pointer',color:'#E2735B'}}>Remove</button></div></div>;
       })}</div>
     }
