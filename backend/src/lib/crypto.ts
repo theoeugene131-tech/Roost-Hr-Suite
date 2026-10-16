@@ -2,16 +2,25 @@ import crypto from "crypto";
 
 /**
  * Field-level encryption for sensitive employee data (bank account numbers,
- * NIN, PAYE TIN, pension PIN, NSITF number). The old frontend-only version
- * stored all of this as plain text in the browser's localStorage — this
- * encrypts it at rest in Postgres instead.
+ * NIN, PAYE TIN, pension PIN, NSITF number).
  *
- * Set ENCRYPTION_KEY in .env to a 32-byte random value, e.g.:
- *   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ * Set ENCRYPTION_KEY to exactly 64 hexadecimal characters (32 bytes). Keep
+ * this value stable and backed up: changing it makes existing encrypted
+ * values unreadable.
  */
-const KEY = process.env.ENCRYPTION_KEY
-  ? Buffer.from(process.env.ENCRYPTION_KEY, "hex")
-  : crypto.randomBytes(32); // dev fallback — set a real key in production, or data won't decrypt across restarts
+const configuredKey = process.env.ENCRYPTION_KEY;
+if (process.env.NODE_ENV === "production" && (!configuredKey || !/^[a-fA-F0-9]{64}$/.test(configuredKey))) {
+  throw new Error("ENCRYPTION_KEY must be set to exactly 64 hexadecimal characters in production.");
+}
+if (configuredKey && !/^[a-fA-F0-9]{64}$/.test(configuredKey)) {
+  throw new Error("ENCRYPTION_KEY must be exactly 64 hexadecimal characters.");
+}
+
+// Stable development-only key prevents local development data becoming
+// unreadable after a restart. It is intentionally not suitable for production.
+const KEY = configuredKey
+  ? Buffer.from(configuredKey, "hex")
+  : crypto.createHash("sha256").update("roost-development-only-key-not-for-production").digest();
 
 export function encryptField(plain: string | null | undefined): string | null {
   if (plain === null || plain === undefined || plain === "") return null;
