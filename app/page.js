@@ -379,7 +379,7 @@ export default function Page(){
             <a href="?demo=1" style={{fontSize:12,border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,textDecoration:'none',color:'#201526'}}>Continue as demo (owner test)</a>
             <button onClick={()=>{ setLicenseKey(''); clearLicense(); }} style={{fontSize:12,background:'transparent',border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,cursor:'pointer'}}>Clear</button>
           </div>
-          <p style={{fontSize:11,opacity:0.55,marginTop:14}}>Developed by <b>Next Level Global</b>. Secure SaaS — key verified via <code>/api/verify</code>. Offline keys accepted after first online activation. Selar webhook → <code>/api/selar-webhook</code> auto-generates keys on purchase.</p>
+          <p style={{fontSize:11,opacity:0.55,marginTop:14}}>Developed by <b>Next Level Global</b>. Selar checkout is available; automatic payment verification is not enabled yet, so license activation must be handled manually.</p>
         </div>
       </div>
     );
