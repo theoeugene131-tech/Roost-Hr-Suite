@@ -10,6 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "roost-backend" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, service: "roost-backend" }));
 
 app.use("/api/auth", authRouter);
 app.use("/api/employees", employeesRouter);
