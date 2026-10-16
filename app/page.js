@@ -570,7 +570,7 @@ function CompanySettings({state,update,cloudMode,showToast}){
   }
   const field={width:'100%',padding:'10px 12px',borderRadius:6,border:'1px solid rgba(32,21,38,0.2)',background:'#fff',color:'#201526',fontSize:13};
   return <div style={{maxWidth:820}}>
-    <div className="panel-head"><div><h2>Company settings</h2><p style={{fontSize:12.5,color:'var(--muted)',marginTop:5}}>Set your company's country and regional defaults.</p></div></div>
+    <div className="panel-head"><div><h2>Company settings</h2><p style={{fontSize:12.5,color:'var(--muted)',marginTop:5}}>Set your company&apos;s country and regional defaults.</p></div></div>
     {!cloudMode && <div style={{padding:12,marginBottom:16,border:'1px solid rgba(226,115,91,0.5)',borderRadius:8,color:'var(--paper)',fontSize:12.5}}>Offline/local mode: these settings are saved on this device only. Connect the authenticated cloud backend to save settings to the company account.</div>}
     <form onSubmit={save} style={{background:'var(--paper)',color:'var(--ink)',borderRadius:8,padding:22}}>
       <div className="field"><label>Company name</label><input style={field} value={form.companyName||''} onChange={e=>setForm(f=>({...f,companyName:e.target.value}))} placeholder="Your registered business name" minLength={2} maxLength={160} required/></div>
