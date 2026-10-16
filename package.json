@@ -1,8 +1,8 @@
 {
-  "name": "roost",
+  "name": "medash-hr-suite",
   "version": "1.0.0",
   "private": true,
-  "description": "Roost — Payroll, HR & Compliance for small teams (offline-first)",
+  "description": "Medash HR Suite — HR management and payroll platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
