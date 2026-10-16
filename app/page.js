@@ -538,7 +538,7 @@ export default function Page(){
 
 
 function CompanySettings({state,update,cloudMode,showToast}){
-  const saved=state.companySettings||{country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}};
+  const saved={companyName:state.companyName||'',...(state.companySettings||{country:'NG',region:'',currency:'NGN',locale:'en-NG',timezone:'Africa/Lagos',workWeek:[1,2,3,4,5],financialYearStartMonth:1,leavePolicies:{}})};
   const [form,setForm]=useState(saved);
   const [busy,setBusy]=useState(false);
   useEffect(()=>{ setForm(saved); },[state.companySettings]);
@@ -552,7 +552,7 @@ function CompanySettings({state,update,cloudMode,showToast}){
     try{
       let next={...form,workWeek:[...(form.workWeek||[])]};
       if(cloudMode) next=await CompanySettingsAPI.update(next);
-      update(s=>{s.companySettings=next;});
+      update(s=>{s.companySettings=next;s.companyName=next.companyName||s.companyName;});
       try{localStorage.setItem('roost_country_settings',JSON.stringify(next));}catch{}
       showToast(cloudMode?'Company settings saved securely ✓':'Settings saved on this device only');
     }catch(err){
@@ -564,6 +564,7 @@ function CompanySettings({state,update,cloudMode,showToast}){
     <div className="panel-head"><div><h2>Company settings</h2><p style={{fontSize:12.5,color:'var(--muted)',marginTop:5}}>Set your company's country and regional defaults.</p></div></div>
     {!cloudMode && <div style={{padding:12,marginBottom:16,border:'1px solid rgba(226,115,91,0.5)',borderRadius:8,color:'var(--paper)',fontSize:12.5}}>Offline/local mode: these settings are saved on this device only. Connect the authenticated cloud backend to save settings to the company account.</div>}
     <form onSubmit={save} style={{background:'var(--paper)',color:'var(--ink)',borderRadius:8,padding:22}}>
+      <div className="field"><label>Company name</label><input style={field} value={form.companyName||''} onChange={e=>setForm(f=>({...f,companyName:e.target.value}))} placeholder="Your registered business name" minLength={2} maxLength={160} required/></div>
       <div className="field"><label>Company country</label><select value={form.country||'NG'} onChange={e=>changeCountry(e.target.value)} style={field}><option value="NG">Nigeria</option><option value="US">United States</option><option value="GB">United Kingdom</option></select></div>
       <div className="field-row">
         <div className="field"><label>State / region</label><input style={field} value={form.region||''} onChange={e=>setForm(f=>({...f,region:e.target.value}))} placeholder="e.g. Lagos, California, Scotland"/></div>
