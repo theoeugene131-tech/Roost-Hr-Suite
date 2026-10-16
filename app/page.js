@@ -375,7 +375,7 @@ export default function Page(){
             <button type="submit" className="btn btn-primary" style={{width:'100%',marginTop:12,padding:12}}>Activate license</button>
           </form>
           <div style={{marginTop:14,display:'flex',gap:8,flexWrap:'wrap'}}>
-            <a href="https://selar.co/m/theoeugene131-tech" target="_blank" rel="noreferrer" style={{fontSize:12,background:'#201526',color:'#fff',padding:'8px 12px',borderRadius:6,textDecoration:'none'}}>Buy on Selar</a>
+            <a href="https://selar.com/5w877x1957" target="_blank" rel="noreferrer" style={{fontSize:12,background:'#201526',color:'#fff',padding:'8px 12px',borderRadius:6,textDecoration:'none'}}>Buy on Selar</a>
             <a href="?demo=1" style={{fontSize:12,border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,textDecoration:'none',color:'#201526'}}>Continue as demo (owner test)</a>
             <button onClick={()=>{ setLicenseKey(''); clearLicense(); }} style={{fontSize:12,background:'transparent',border:'1px solid rgba(32,21,38,0.2)',padding:'8px 12px',borderRadius:6,cursor:'pointer'}}>Clear</button>
           </div>
