@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkLicenseKey } from "@/lib/licenseServer";
+import { checkLicenseKey } from "@/lib/licenseServer.mjs";
 import { rateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
