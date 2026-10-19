@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 process.env.LICENSE_SECRET = "test-secret-for-license-tests-at-least-32-chars";
-const { generateLicenseKey, checkLicenseKey } = await import("../lib/licenseServer.js");
+const { generateLicenseKey, checkLicenseKey } = await import("../lib/licenseServer.mjs");
 
 test("license key for the same payment reference is stable and verifies", () => {
   const first = generateLicenseKey("ORDER-123");
