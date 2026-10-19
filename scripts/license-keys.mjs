@@ -3,7 +3,7 @@
 //   node --env-file=.env.local scripts/license-keys.mjs --ref ORDER-123
 //   node --env-file=.env.local scripts/license-keys.mjs --ref buyer@example.com
 //   node --env-file=.env.local scripts/license-keys.mjs --check ROOST-XXXX-XXXX-XXXX-XXXX-XXXX
-import { generateLicenseKey, checkLicenseKey } from "../lib/licenseServer.js";
+import { generateLicenseKey, checkLicenseKey } from "../lib/licenseServer.mjs";
 const args = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 try {
