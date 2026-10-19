@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { loadState, saveState } from "@/lib/store";
-import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense } from "@/lib/license";
+import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense, checkLicense, recentlyVerified } from "@/lib/license";
 import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
 
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
@@ -329,20 +329,42 @@ export default function Page(){
     window.addEventListener('online',updateOnline);
     window.addEventListener('offline',updateOnline);
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
-    // SaaS license check — Selar. Allow bypass via ?license=ROOST-xxx or ?demo=1 for owner testing
-    const params=new URLSearchParams(window.location.search);
-    const urlKey=params.get('license');
-    const demoBypass=params.get('demo')==='1';
-    if(demoBypass){ setLicenseOk(true); setLicenseChecking(false); }
-    else if(urlKey && isValidFormat(urlKey)){ saveLicense(urlKey,{plan:'url'}); setLicenseKey(normalizeKey(urlKey)); setLicenseOk(true); setLicenseChecking(false); }
-    else {
-      const stored=getStoredKey();
-      if(stored && isValidFormat(stored)){
-        // verify with API (offline falls back to format check)
-        fetch('/api/verify',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:stored})}).then(r=>r.json()).then(j=>{
-          setLicenseOk(!!j.valid); setLicenseChecking(false); if(!j.valid) setLicenseKey(stored);
-        }).catch(()=>{ setLicenseOk(true); setLicenseChecking(false); });
-      } else { if(stored) setLicenseKey(stored); setLicenseOk(false); setLicenseChecking(false); }
+    // A URL key is only a candidate: the server must confirm its signature.
+    // Demo bypass is allowed only on a deployment explicitly configured for demos.
+    const params = new URLSearchParams(window.location.search);
+    const urlKey = params.get("license");
+    const demoBypass = process.env.NEXT_PUBLIC_ALLOW_DEMO === "1" && params.get("demo") === "1";
+    if (demoBypass) {
+      setLicenseOk(true);
+      setLicenseChecking(false);
+    } else {
+      const stored = getStoredKey();
+      const candidate = urlKey && isValidFormat(urlKey) ? normalizeKey(urlKey) : stored;
+      if (candidate && isValidFormat(candidate)) {
+        setLicenseKey(candidate);
+        checkLicense(candidate).then((result) => {
+          if (result.valid) {
+            saveLicense(candidate, { plan: result.plan });
+            setLicenseOk(true);
+            if (urlKey) {
+              try { window.history.replaceState(null, "", window.location.pathname); } catch {}
+            }
+          } else if (result.offline) {
+            setLicenseOk(recentlyVerified(30));
+          } else {
+            clearLicense();
+            setLicenseOk(false);
+          }
+          setLicenseChecking(false);
+        }).catch(() => {
+          setLicenseOk(recentlyVerified(30));
+          setLicenseChecking(false);
+        });
+      } else {
+        if (stored) setLicenseKey(stored);
+        setLicenseOk(false);
+        setLicenseChecking(false);
+      }
     }
     return ()=>{ window.removeEventListener('online',updateOnline); window.removeEventListener('offline',updateOnline); };
   },[]);
@@ -350,17 +372,20 @@ export default function Page(){
   useEffect(()=>{ if(!online) setToast("You are offline — changes will sync when you reconnect."); else if(toast && toast.includes("offline")) setToast("Back online ✓"); },[online]);
 
   if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost…</div>;
-  async function handleLicenseSubmit(e){
+  async function handleLicenseSubmit(e) {
     e.preventDefault();
-    if(!isValidFormat(licenseKey)) { showToast('Invalid key. Format: ROOST-XXXX-XXXX-...'); return; }
-    try{
-      const res=await fetch('/api/verify',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:licenseKey})});
-      const j=await res.json();
-      if(j.valid){ saveLicense(licenseKey,{plan:j.plan}); setLicenseOk(true); showToast('License activated ✓'); }
-      else { showToast(j.reason||'Invalid license'); }
-    }catch{
-      // offline: accept format-valid key
-      saveLicense(licenseKey,{plan:'offline'}); setLicenseOk(true); showToast('License saved (offline)');
+    if (!isValidFormat(licenseKey)) { showToast("Enter a key in the format ROOST-XXXX-XXXX-XXXX-XXXX-XXXX."); return; }
+    const result = await checkLicense(licenseKey);
+    if (result.valid) {
+      saveLicense(licenseKey, { plan: result.plan });
+      setLicenseKey(normalizeKey(licenseKey));
+      setLicenseOk(true);
+      showToast("License activated ✓");
+    } else if (result.offline && recentlyVerified(30)) {
+      setLicenseOk(true);
+      showToast("Using your recently verified license offline.");
+    } else {
+      showToast(result.reason || "License could not be verified.");
     }
   }
   if(!licenseOk){
