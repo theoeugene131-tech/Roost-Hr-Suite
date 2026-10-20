@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { loadState, saveState } from "@/lib/store";
-import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense, checkLicense, recentlyVerified } from "@/lib/license";
+import { normalizeKey, isValidFormat, getStoredKey, saveLicense, clearLicense, checkLicense } from "@/lib/license";
 import { getApiBase, setApiBaseOverride, getToken, setSession, getSessionUser, clearSession, AuthAPI, EmployeesAPI, PayrollAPI } from "@/lib/api";
 
 const AVATAR_COLORS = ['#E2735B','#C9A227','#4C8577','#7D6BA6','#B3563F','#3E7C8A'];
@@ -349,15 +349,14 @@ export default function Page(){
             if (urlKey) {
               try { window.history.replaceState(null, "", window.location.pathname); } catch {}
             }
-          } else if (result.offline) {
-            setLicenseOk(recentlyVerified(30));
           } else {
-            clearLicense();
+            // Do not trust localStorage as proof of payment when verification fails.
+            if (!result.offline) clearLicense();
             setLicenseOk(false);
           }
           setLicenseChecking(false);
         }).catch(() => {
-          setLicenseOk(recentlyVerified(30));
+          setLicenseOk(false);
           setLicenseChecking(false);
         });
       } else {
@@ -381,10 +380,8 @@ export default function Page(){
       setLicenseKey(normalizeKey(licenseKey));
       setLicenseOk(true);
       showToast("License activated ✓");
-    } else if (result.offline && recentlyVerified(30)) {
-      setLicenseOk(true);
-      showToast("Using your recently verified license offline.");
     } else {
+      // Activation requires a successful server response; browser storage is not proof of payment.
       showToast(result.reason || "License could not be verified.");
     }
   }
