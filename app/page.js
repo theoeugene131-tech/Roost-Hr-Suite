@@ -408,9 +408,13 @@ export default function Page(){
         .stats{display:flex;gap:30px;flex-wrap:wrap;padding-bottom:22px;}
         .stat .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;}
         .stat .value{font-family:'Newsreader',serif;font-size:23px;font-weight:600;}
-        nav.tabs{display:flex;gap:4px;padding:0 40px;border-bottom:1px solid var(--line);overflow-x:auto;}
-        .tab-btn{background:none;border:none;color:var(--muted);padding:12px 16px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
-        .tab-btn.active{color:var(--paper);border-bottom-color:var(--coral);}
+        nav.tabs{display:flex;align-items:center;gap:12px;padding:14px 40px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+        .nav-picker{display:flex;align-items:center;gap:8px;min-width:0;}
+        .nav-picker label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;}
+        .nav-picker select{max-width:100%;background:var(--bg-2);color:var(--paper);border:1px solid var(--line);border-radius:7px;padding:10px 12px;font-size:13px;min-width:180px;cursor:pointer;}
+        .nav-picker.page-picker select{min-width:210px;}
+        .nav-context{font-size:12px;color:var(--muted);margin-left:auto;}
+        @media(max-width:720px){nav.tabs{gap:10px;} .nav-picker{width:100%;justify-content:space-between;} .nav-picker select,.nav-picker.page-picker select{flex:1;min-width:0;} .nav-context{display:none;}}
         main{padding:28px 40px 60px;}
         .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:14px;}
         .panel-head h2{font-family:'Newsreader',serif;font-size:19px;font-weight:600;}
@@ -490,8 +494,37 @@ export default function Page(){
         </div>
       </header>
 
-      <nav className="tabs">
-        {tabs.map(t=><button key={t} className={`tab-btn ${currentTab===t?'active':''}`} onClick={()=>setCurrentTab(t)}>{TAB_LABELS[t]}</button>)}
+      <nav className="tabs" aria-label="Main navigation">
+        {(() => {
+          const navGroups = [
+            {label:'Overview', tabs:['overview']},
+            {label:'People', tabs:['team','docs','org']},
+            {label:'HR Operations', tabs:['training','leave','attendance','hiring']},
+            {label:'Payroll & Compliance', tabs:['runpayroll','history','regulatory','compliance']},
+            {label:'Performance', tabs:['reviews']},
+            {label:'Reports', tabs:['reports']},
+            {label:'My Workspace', tabs:['myprofile']},
+          ].map(group=>({...group,tabs:group.tabs.filter(t=>tabs.includes(t))})).filter(group=>group.tabs.length);
+          const activeGroup = navGroups.find(group=>group.tabs.includes(currentTab)) || navGroups[0];
+          return <>
+            <div className="nav-picker">
+              <label htmlFor="nav-section">Section</label>
+              <select id="nav-section" value={activeGroup?.label||''} onChange={e=>{
+                const next=navGroups.find(group=>group.label===e.target.value);
+                if(next?.tabs.length) setCurrentTab(next.tabs[0]);
+              }}>
+                {navGroups.map(group=><option key={group.label} value={group.label}>{group.label}</option>)}
+              </select>
+            </div>
+            <div className="nav-picker page-picker">
+              <label htmlFor="nav-page">Page</label>
+              <select id="nav-page" value={currentTab} onChange={e=>setCurrentTab(e.target.value)}>
+                {(activeGroup?.tabs||tabs).map(t=><option key={t} value={t}>{TAB_LABELS[t]}</option>)}
+              </select>
+            </div>
+            <span className="nav-context">{TAB_LABELS[currentTab]}{state.companyName ? ' · '+state.companyName : ''}</span>
+          </>;
+        })()}
       </nav>
 
       <main>
