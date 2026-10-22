@@ -11,6 +11,7 @@ employeesRouter.use(requireAuth);
 const SENSITIVE_FIELDS = ["account", "nin", "payeTin", "pensionPin", "nsitfNumber"] as const;
 
 function toPublic(emp: any) {
+  if (!emp) return emp;
   const out = { ...emp };
   for (const f of SENSITIVE_FIELDS) out[f] = decryptField(emp[f]);
   return out;
@@ -31,9 +32,6 @@ const employeeSchema = z.object({
   active: z.boolean().optional().default(true),
 });
 
-// Admins see the full roster. Employees only ever see their own record —
-// this is the actual access control the old "Viewing as" dropdown didn't
-// provide (anyone could switch to "Employee" and browse any teammate's data).
 employeesRouter.get("/", async (req: AuthedRequest, res) => {
   const all = (await db.table("employees", req.auth!.companyId)) as any[];
   if (req.auth!.role === "employee") {
@@ -46,7 +44,6 @@ employeesRouter.post("/", requireAdmin, async (req: AuthedRequest, res) => {
   const parsed = employeeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const d = parsed.data;
-
   const employee = {
     id: nanoid(),
     companyId: req.auth!.companyId,
@@ -69,26 +66,19 @@ employeesRouter.post("/", requireAdmin, async (req: AuthedRequest, res) => {
 });
 
 employeesRouter.patch("/:id", requireAdmin, async (req: AuthedRequest, res) => {
-  const existing = await db.find("employees", req.params.id);
-  if (!existing || existing.companyId !== req.auth!.companyId) {
-    return res.status(404).json({ error: "Employee not found" });
-  }
   const parsed = employeeSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
   const patch: Record<string, any> = { ...parsed.data };
   for (const f of SENSITIVE_FIELDS) {
     if (f in patch) patch[f] = encryptField(patch[f]);
   }
-  const updated = await db.update("employees", req.params.id, patch);
+  const updated = await db.updateForCompany("employees", req.params.id, req.auth!.companyId, patch);
+  if (!updated) return res.status(404).json({ error: "Employee not found" });
   res.json(toPublic(updated));
 });
 
 employeesRouter.delete("/:id", requireAdmin, async (req: AuthedRequest, res) => {
-  const existing = await db.find("employees", req.params.id);
-  if (!existing || existing.companyId !== req.auth!.companyId) {
-    return res.status(404).json({ error: "Employee not found" });
-  }
-  await db.delete("employees", req.params.id);
+  const removed = await db.deleteForCompany("employees", req.params.id, req.auth!.companyId);
+  if (!removed) return res.status(404).json({ error: "Employee not found" });
   res.json({ ok: true });
 });
