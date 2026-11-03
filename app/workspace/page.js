@@ -157,6 +157,18 @@ function migrateState(s){
       changed=true;
     }
   });
+  // Ensure every standard course has five study lessons plus a separate final assessment.
+  s.trainings.forEach(tr=>{
+    const lessonCount=tr.modules.filter(m=>m.type!=='quiz').length;
+    const lessonDefs=COURSE_LESSONS[tr.title]||[];
+    for(let i=lessonCount;i<lessonDefs.length;i++){
+      const lesson=lessonDefs[i];
+      const quizIndex=tr.modules.findIndex(m=>m.type==='quiz');
+      const module={id:uid(),title:`${i+1}. ${lesson.heading}`,type:'doc',content:'Detailed lesson, workplace example and practical exercise',duration:'25m'};
+      if(quizIndex>=0) tr.modules.splice(quizIndex,0,module); else tr.modules.push(module);
+      changed=true;
+    }
+  });
   s.employees.forEach(e=>{
     if(!e.documents){ e.documents={}; changed=true; }
     if(e.nin===undefined){ e.nin=''; e.payeTin=''; e.nhfNumber=''; e.pensionPin=''; e.nsitfNumber=''; changed=true; }
@@ -325,7 +337,7 @@ export default function Page(){
     setDemoMode(isPublicDemo);
     let loaded=loadState(isPublicDemo ? 'medash_public_demo_v1' : undefined);
     if(loaded){ loaded=migrateState(loaded); setState(loaded); }
-    else { const s=seedDemo(); setState(s); saveState(s,isPublicDemo ? 'medash_public_demo_v1' : undefined); }
+    else { const s=migrateState(seedDemo()); setState(s); saveState(s,isPublicDemo ? 'medash_public_demo_v1' : undefined); }
     // Cloud backend (opt-in): hydrate employees + payroll when configured + logged in
     try{ if(getApiBase() && !cloudOff() && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
     const updateOnline=()=>setOnline(navigator.onLine);
