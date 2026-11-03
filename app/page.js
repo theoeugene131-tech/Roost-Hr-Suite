@@ -82,7 +82,7 @@ export default function HomePage() {
 
       <section id="global" className="markets-grid" style={{maxWidth:1180,margin:"0 auto",padding:"76px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center"}}>
         <div><div style={{color:teal,fontSize:12,fontWeight:800,letterSpacing:"1.4px"}}>INTERNATIONAL DIRECTION</div><h2 style={{fontSize:36,letterSpacing:"-1px",margin:"12px 0"}}>Designed with international businesses in mind.</h2><p style={{color:muted,lineHeight:1.8}}>Medash is being prepared to support organisations operating across different countries, currencies and workforce requirements. Country-specific payroll and statutory settings must be selected and checked before use.</p></div>
-        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{["United Kingdom","United States","Nigeria"].map((x)=><div key={x} style={{border:"1px solid #E2E9EF",borderRadius:9,padding:"18px 20px",fontWeight:700,flex:"1 1 140px"}}>{x}<div style={{fontSize:11,color:muted,fontWeight:400,marginTop:6}}>Supported market focus</div></div>)}</div>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{["United Kingdom","United States","Nigeria"].map((x)=><div key={x} style={{border:"1px solid #E2E9EF",borderRadius:9,padding:"18px 20px",fontWeight:700,flex:"1 1 140px"}}>{x}<div style={{fontSize:11,color:muted,fontWeight:400,marginTop:6}}>Priority markets</div></div>)}</div>
       </section>
 
       <section style={{background:"#EAF4F3",padding:"60px 28px",textAlign:"center"}}>
