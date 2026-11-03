@@ -23,7 +23,7 @@ export default function HomePage() {
       </header>
 
       <section style={{background:pale,padding:"72px 28px 78px"}}>
-        <div style={{maxWidth:1180,margin:"0 auto",display:"grid",gridTemplateColumns:"1.02fr .98fr",gap:50,alignItems:"center"}}>
+        <div className="hero-grid" style={{maxWidth:1180,margin:"0 auto",display:"grid",gridTemplateColumns:"1.02fr .98fr",gap:50,alignItems:"center"}}>
           <div>
             <div style={{display:"inline-flex",alignItems:"center",gap:8,color:teal,fontSize:12,fontWeight:800,letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:20}}>
               <span style={{width:7,height:7,borderRadius:9,background:coral}}/> People operations, made clearer
@@ -60,7 +60,7 @@ export default function HomePage() {
           <h2 style={{fontSize:38,letterSpacing:"-1.3px",margin:"12px 0"}}>Three essential areas. One connected suite.</h2>
           <p style={{color:muted,lineHeight:1.7}}>Give your team a more consistent way to manage employee information, pay processes and continuous learning.</p>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:18}}>
+        <div className="platform-grid" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:18}}>
           {[
             ["01","HR Management","Organise employee records, onboarding documents, leave, attendance, recruitment and performance activities."],
             ["02","Payroll","Prepare payroll, review calculations and maintain payroll history with support for local settings and manual HR review."],
@@ -72,7 +72,7 @@ export default function HomePage() {
       </section>
 
       <section id="why-medash" style={{background:ink,color:"#fff",padding:"70px 28px"}}>
-        <div style={{maxWidth:1180,margin:"0 auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:55,alignItems:"center"}}>
+        <div className="why-grid" style={{maxWidth:1180,margin:"0 auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:55,alignItems:"center"}}>
           <div><div style={{color:"#8ED0C9",fontSize:12,fontWeight:800,letterSpacing:"1.4px"}}>BUILT FOR PRACTICAL WORK</div><h2 style={{fontSize:38,letterSpacing:"-1.2px",lineHeight:1.15,margin:"14px 0 18px"}}>Less scattered administration. Better workforce visibility.</h2><p style={{color:"#C6D0DC",lineHeight:1.8,fontSize:15}}>Bring day-to-day people processes into a single environment, with clear areas for HR, Payroll and Training. Start with the tools your organisation needs and build from there.</p></div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             {["Employee records in one place","Payroll preparation and history","Learning and course assessments","Leave and attendance workflows","Recruitment and performance tools","Role-based work areas"].map((x)=><div key={x} style={{border:"1px solid rgba(255,255,255,.16)",borderRadius:8,padding:16,fontSize:13,lineHeight:1.5}}>✓ &nbsp;{x}</div>)}
@@ -80,7 +80,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="global" style={{maxWidth:1180,margin:"0 auto",padding:"76px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center"}}>
+      <section id="global" className="markets-grid" style={{maxWidth:1180,margin:"0 auto",padding:"76px 28px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center"}}>
         <div><div style={{color:teal,fontSize:12,fontWeight:800,letterSpacing:"1.4px"}}>INTERNATIONAL DIRECTION</div><h2 style={{fontSize:36,letterSpacing:"-1px",margin:"12px 0"}}>Designed with international businesses in mind.</h2><p style={{color:muted,lineHeight:1.8}}>Medash is being prepared to support organisations operating across different countries, currencies and workforce requirements. Country-specific payroll and statutory settings must be selected and checked before use.</p></div>
         <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>{["United Kingdom","United States","Nigeria"].map((x)=><div key={x} style={{border:"1px solid #E2E9EF",borderRadius:9,padding:"18px 20px",fontWeight:700,flex:"1 1 140px"}}>{x}<div style={{fontSize:11,color:muted,fontWeight:400,marginTop:6}}>Supported market focus</div></div>)}</div>
       </section>
@@ -89,7 +89,7 @@ export default function HomePage() {
         <div style={{maxWidth:760,margin:"0 auto"}}><h2 style={{fontSize:36,letterSpacing:"-1px",margin:"0 0 14px"}}>See how Medash works.</h2><p style={{color:muted,lineHeight:1.7,margin:"0 0 25px"}}>Explore the sample workspace before deciding whether Medash is right for your organisation.</p><a href="/workspace?demo=1&local=1" style={{display:"inline-block",background:teal,color:"#fff",padding:"15px 24px",borderRadius:7,textDecoration:"none",fontWeight:800}}>Start your free demo →</a></div>
       </section>
       <footer style={{maxWidth:1180,margin:"0 auto",padding:"28px",display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",fontSize:12,color:muted}}><span>© {new Date().getFullYear()} Medash HR Suite</span><span>HR Management · Payroll · Training</span><a href="/workspace" style={{color:teal,textDecoration:"none",fontWeight:700}}>Client login</a></footer>
-      <style jsx>{`@media(max-width:800px){header{align-items:flex-start!important}header nav{gap:12px!important}.hero-grid{grid-template-columns:1fr!important}}`}</style>
+      <style jsx>{`@media(max-width:800px){header{align-items:flex-start!important;flex-direction:column!important}header nav{gap:12px!important}.hero-grid,.why-grid,.markets-grid{grid-template-columns:1fr!important}.platform-grid{grid-template-columns:1fr!important}main section{padding-top:48px!important;padding-bottom:48px!important}}`}</style>
     </main>
   );
 }
