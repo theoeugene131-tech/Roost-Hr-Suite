@@ -323,9 +323,9 @@ export default function Page(){
     const demoParams=new URLSearchParams(window.location.search);
     const isPublicDemo=demoParams.get('demo')==='1';
     setDemoMode(isPublicDemo);
-    let loaded=loadState(isPublicDemo ? 'medash_public_demo_v1' : undefined);
+    let loaded=loadState(isPublicDemo ? 'roost_public_demo_v1' : undefined);
     if(loaded){ loaded=migrateState(loaded); setState(loaded); }
-    else { const s=seedDemo(); setState(s); saveState(s,isPublicDemo ? 'medash_public_demo_v1' : undefined); }
+    else { const s=seedDemo(); setState(s); saveState(s,isPublicDemo ? 'roost_public_demo_v1' : undefined); }
     // Cloud backend (opt-in): hydrate employees + payroll when configured + logged in
     try{ if(getApiBase() && !cloudOff() && getToken()) hydrateCloud(); else { const me=getSessionUser(); if(me && getToken()) setApiUser(me); } }catch{}
     const updateOnline=()=>setOnline(navigator.onLine);
@@ -350,10 +350,10 @@ export default function Page(){
     }
     return ()=>{ window.removeEventListener('online',updateOnline); window.removeEventListener('offline',updateOnline); };
   },[]);
-  useEffect(()=>{ if(state) saveState(state,demoMode ? 'medash_public_demo_v1' : undefined); },[state,demoMode]);
+  useEffect(()=>{ if(state) saveState(state,demoMode ? 'roost_public_demo_v1' : undefined); },[state,demoMode]);
   useEffect(()=>{ if(!online) setToast("You are offline — changes will sync when you reconnect."); else if(toast && toast.includes("offline")) setToast("Back online ✓"); },[online]);
 
-  if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Medash HR Suite…</div>;
+  if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost HR Suite…</div>;
   async function handleLicenseSubmit(e){
     e.preventDefault();
     if(!isValidFormat(licenseKey)) { showToast('Invalid key. Format: ROOST-XXXX-XXXX-...'); return; }
@@ -371,9 +371,9 @@ export default function Page(){
     return (
       <div style={{minHeight:'100vh', background:'#241623', color:'#EDEEF2', display:'flex', alignItems:'center', justifyContent:'center', padding:24}}>
         <div style={{maxWidth:520, width:'100%', background:'#EDEEF2', color:'#201526', borderRadius:12, padding:32, boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}} >Medash HR Suite</div><div style={{fontSize:12,opacity:0.6}}>Payroll, HR & Compliance — SaaS License</div></div></div>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}} >Roost HR Suite</div><div style={{fontSize:12,opacity:0.6}}>Payroll, HR & Compliance — SaaS License</div></div></div>
           <h2 style={{fontFamily:'Newsreader, serif',fontSize:18,marginBottom:8}}>Enter your license key</h2>
-          <p style={{fontSize:13,opacity:0.7,lineHeight:1.5}}>You purchased on <b>Selar</b>. Paste the key from your delivery email. Keys look like <code style={{background:'#fff',padding:'2px 6px',borderRadius:4}}>ROOST-XXXX-XXXX-XXXX</code>. Need help? Contact your Medash administrator.</p>
+          <p style={{fontSize:13,opacity:0.7,lineHeight:1.5}}>You purchased on <b>Selar</b>. Paste the key from your delivery email. Keys look like <code style={{background:'#fff',padding:'2px 6px',borderRadius:4}}>ROOST-XXXX-XXXX-XXXX</code>. Need help? Contact your Roost administrator.</p>
           <form onSubmit={handleLicenseSubmit} style={{marginTop:16}}>
             <input value={licenseKey} onChange={ev=>setLicenseKey(ev.target.value)} placeholder="ROOST-XXXX-XXXX-XXXX" style={{width:'100%',padding:'12px 14px',borderRadius:8,border:'1px solid rgba(32,21,38,0.2)',fontFamily:'IBM Plex Mono',fontSize:14,background:'#fff'}}/>
             <button type="submit" className="btn btn-primary" style={{width:'100%',marginTop:12,padding:12}}>Activate license</button>
@@ -438,7 +438,7 @@ export default function Page(){
       `}</style>
 
       <div style={{background: online? '#4C8577':'#E2735B', color:'#fff', textAlign:'center', fontSize:12, padding:'6px 10px', fontWeight:600}}>
-        {demoMode ? '● FREE DEMO — sample data only; changes stay in this browser' : (online? '● Online — synced':'○ Offline — working locally, will sync when reconnected') + '  |  Medash HR Suite'}
+        {demoMode ? '● FREE DEMO — sample data only; changes stay in this browser' : (online? '● Online — synced':'○ Offline — working locally, will sync when reconnected') + '  |  Roost HR Suite'}
         {!demoMode && <button onClick={()=>{ if(confirm('Remove license?')){ clearLicense(); setLicenseOk(false); setLicenseKey(''); location.reload(); } }} style={{marginLeft:10, background:'rgba(0,0,0,0.2)', color:'#fff', border:'none', padding:'2px 8px', borderRadius:10, fontSize:10, cursor:'pointer'}}>Sign out</button>}
       </div>
       {toast && <div style={{position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', background:'#201526', color:'#EDEEF2', padding:'10px 16px', borderRadius:8, fontSize:13, zIndex:60}}>{toast}</div>}
@@ -448,7 +448,7 @@ export default function Page(){
           <div className="brand-mark"></div>
           <div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <h1 style={{fontFamily:'Newsreader, serif', fontSize:22, fontWeight:600, fontStyle:'italic'}}>Medash HR Suite</h1>
+              <h1 style={{fontFamily:'Newsreader, serif', fontSize:22, fontWeight:600, fontStyle:'italic'}}>Roost HR Suite</h1>
               <span style={{fontSize:10,background:'rgba(237,238,242,0.08)',border:'1px solid var(--line)',padding:'2px 6px',borderRadius:20,color:'var(--muted)'}}>{state.companyName || '—'}</span>
             </div>
             <p style={{fontSize:11.5, color:'var(--muted)', marginTop:2}}>HR Management · Payroll · Training</p>
@@ -477,10 +477,10 @@ export default function Page(){
             <button onClick={()=>{
               const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
               const url=URL.createObjectURL(blob);
-              const a=document.createElement('a'); a.href=url; a.download=`medash-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); showToast('Backup saved — keeps all data offline-safe');
+              const a=document.createElement('a'); a.href=url; a.download=`roost-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); showToast('Backup saved — keeps all data offline-safe');
             }} style={{background:'#4C8577',color:'#fff',border:'none',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer',fontWeight:700}}>⬇ Save / Backup</button>
-            <label style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>⬆ Restore<input type="file" accept=".json" style={{display:'none'}} onChange={ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.employees) throw new Error('Invalid backup'); if(confirm(`Restore backup from ${j.companyName||'file'}? This will overwrite current data.`)){ const mig=migrateState(j); setState(mig); saveState(mig,demoMode ? 'medash_public_demo_v1' : undefined); showToast('Backup restored ✓'); }}catch(e){ alert('Invalid backup file'); } }; r.readAsText(f); }}/></label>
-            <button onClick={()=>{ if(confirm('Reset to demo data?')){ const s=seedDemo(); setState(s); saveState(s,demoMode ? 'medash_public_demo_v1' : undefined); showToast('Demo data restored'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Reset demo</button>
+            <label style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>⬆ Restore<input type="file" accept=".json" style={{display:'none'}} onChange={ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.employees) throw new Error('Invalid backup'); if(confirm(`Restore backup from ${j.companyName||'file'}? This will overwrite current data.`)){ const mig=migrateState(j); setState(mig); saveState(mig,demoMode ? 'roost_public_demo_v1' : undefined); showToast('Backup restored ✓'); }}catch(e){ alert('Invalid backup file'); } }; r.readAsText(f); }}/></label>
+            <button onClick={()=>{ if(confirm('Reset to demo data?')){ const s=seedDemo(); setState(s); saveState(s,demoMode ? 'roost_public_demo_v1' : undefined); showToast('Demo data restored'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Reset demo</button>
             {cloudMode
               ? <span style={{fontSize:11,background:'rgba(76,133,119,0.2)',border:'1px solid rgba(76,133,119,0.5)',color:'#7FD1B9',borderRadius:6,padding:'8px 10px'}}>☁ {apiUser.email||apiUser.role}{cloudLoading?' · syncing…':''}</span>
               : cloudBase
@@ -545,7 +545,7 @@ export default function Page(){
         {currentTab==='myprofile' && <MyProfile state={state} />}
       </main>
       <footer style={{borderTop:'1px solid var(--line)',padding:'16px 40px',textAlign:'center',fontSize:12,color:'var(--muted)',background:'rgba(0,0,0,0.15)'}}>
-        Medash HR Suite · HR Management · Payroll · Training
+        Roost HR Suite · HR Management · Payroll · Training
       </footer>
 
       {modal && <Modal modal={modal} setModal={setModal} state={state} update={update} showToast={showToast} />}
@@ -766,7 +766,7 @@ function printSchedule({companyName, period, lines}){
     .hdr{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #222; padding-bottom:12px}
     @media print{ button{display:none} }
   </style></head><body>
-  <div class="hdr"><div><h1>${companyName || 'Company'}</h1><h2>Monthly Payment Schedule — ${periodLabel(period)} &nbsp;|&nbsp; Generated ${new Date().toLocaleDateString('en-NG')} ${new Date().toLocaleTimeString()}</h2></div><div style="text-align:right; font-size:11px">Medash HR Suite<br/>HR Management · Payroll · Training</div></div>
+  <div class="hdr"><div><h1>${companyName || 'Company'}</h1><h2>Monthly Payment Schedule — ${periodLabel(period)} &nbsp;|&nbsp; Generated ${new Date().toLocaleDateString('en-NG')} ${new Date().toLocaleTimeString()}</h2></div><div style="text-align:right; font-size:11px">Roost HR Suite<br/>HR Management · Payroll · Training</div></div>
   <table>
     <thead><tr><th>#</th><th>Staff Name</th><th>Role</th><th>Bank</th><th>Account No.</th><th style="text-align:right">Gross</th><th style="text-align:right">PAYE</th><th style="text-align:right">Pension (8%)</th><th style="text-align:right">NHF</th><th style="text-align:right">Net Pay</th><th>Signature</th></tr></thead>
     <tbody>
@@ -798,7 +798,7 @@ function printCertificate({companyName, cert, employee, training}){
     <div style="margin:20px 0; font-size:13px">This is to certify that</div>
     <div class="name">${employee.name}</div><div style="font-size:12px; opacity:0.7">${employee.role} · ${companyName||''}</div>
     <div style="margin:18px 0; font-size:13px">has successfully completed the training with score <span class="score">${cert.score||'—'}%</span></div>
-    <div style="font-size:11px; color:#666">Issued ${new Date(cert.issuedAt).toLocaleDateString('en-NG')} · Certificate ID ${cert.id.slice(0,8).toUpperCase()} · Medash HR Suite</div>
+    <div style="font-size:11px; color:#666">Issued ${new Date(cert.issuedAt).toLocaleDateString('en-NG')} · Certificate ID ${cert.id.slice(0,8).toUpperCase()} · Roost HR Suite</div>
     <div class="foot"><div>Training Coordinator<br/><br/>Signature / Date</div><div>CEO / HR Head<br/><br/>Signature / Date</div></div>
     <div style="margin-top:18px"><button onclick="window.print()" style="padding:10px 18px; background:#201526; color:#fff; border:none; border-radius:6px; cursor:pointer">Print / Save PDF</button> <button onclick="window.close()" style="padding:10px 18px">Close</button></div>
   </div></body></html>`);
@@ -1252,7 +1252,7 @@ function AuthScreen({authForm,setAuthForm,onAuth,showToast}){
   return (
     <div style={{minHeight:'100vh', background:'#241623', color:'#EDEEF2', display:'flex', alignItems:'center', justifyContent:'center', padding:24}}>
       <div style={{maxWidth:480, width:'100%', background:'#EDEEF2', color:'#201526', borderRadius:12, padding:32, boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}}>Medash HR Suite</div><div style={{fontSize:12,opacity:0.6}}>Real login · Postgres · server payroll — {getApiBase()}</div></div></div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}}>Roost HR Suite</div><div style={{fontSize:12,opacity:0.6}}>Real login · Postgres · server payroll — {getApiBase()}</div></div></div>
         <div style={{display:'flex',gap:8,marginBottom:16}}>
           {['login','signup'].map(m=><button key={m} onClick={()=>setAuthForm({...f,mode:m})} style={{flex:1,padding:'9px 0',borderRadius:6,border:'1px solid rgba(32,21,38,0.2)',background:f.mode===m?'#201526':'transparent',color:f.mode===m?'#fff':'#201526',fontSize:13,fontWeight:600,cursor:'pointer',textTransform:'capitalize'}}>{m==='login'?'Log in':'New company'}</button>)}
         </div>
