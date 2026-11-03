@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Medash HR Suite | HR Management, Payroll & Training",
-  description: "Medash HR Suite brings HR management, payroll and employee training into one organised workspace for growing businesses.",
+  title: "Roost HR Suite | HR Management, Payroll & Training",
+  description: "Roost HR Suite brings HR management, payroll and employee training into one organised workspace for growing businesses.",
   manifest: "/manifest.json",
   themeColor: "#241623",
 };
