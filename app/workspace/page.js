@@ -164,8 +164,8 @@ function migrateState(s){
     for(let i=lessonCount;i<lessonDefs.length;i++){
       const lesson=lessonDefs[i];
       const quizIndex=tr.modules.findIndex(m=>m.type==='quiz');
-      const module={id:uid(),title:`${i+1}. ${lesson.heading}`,type:'doc',content:'Detailed lesson, workplace example and practical exercise',duration:'25m'};
-      if(quizIndex>=0) tr.modules.splice(quizIndex,0,module); else tr.modules.push(module);
+      const lessonModule={id:uid(),title:`${i+1}. ${lesson.heading}`,type:'doc',content:'Detailed lesson, workplace example and practical exercise',duration:'25m'};
+      if(quizIndex>=0) tr.modules.splice(quizIndex,0,lessonModule); else tr.modules.push(lessonModule);
       changed=true;
     }
   });
