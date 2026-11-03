@@ -878,20 +878,7 @@ function Training({state,update,setModal,showToast}){
             </td>
             <td style={{textAlign:'center',padding:'8px',fontFamily:'monospace'}}>{en.score ?? '—'}{en.score!==null?'%':''}</td>
             <td style={{padding:'8px',display:'flex',gap:6,flexWrap:'wrap'}}>
-              {en.progress<100 && <button onClick={()=>{
-                const tr2=state.trainings.find(t=>t.id===en.trainingId);
-                const next=tr2.modules.find(m=>!en.completedModules.includes(m.id));
-                if(!next) return;
-                const score=next.type==='quiz'? Math.floor(70+Math.random()*30) : null;
-                update(s=>{
-                  const e=s.enrollments.find(x=>x.id===en.id);
-                  e.completedModules.push(next.id);
-                  e.progress=Math.round(100*e.completedModules.length/tr2.modules.length);
-                  if(score!==null) e.score=score;
-                  if(e.progress===100){ e.completedAt=new Date().toISOString().slice(0,10); const certId=uid(); e.certificateId=certId; s.certificates.push({id:certId, employeeId:e.employeeId, trainingId:e.trainingId, issuedAt:e.completedAt, score:e.score}); }
-                });
-                showToast(next.title+' completed');
-              }} style={{fontSize:11,background:'#201526',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Complete next</button>}
+              {en.progress<100 && <button onClick={()=>setModal({type:'courseView',data:en.trainingId})} style={{fontSize:11,background:'#201526',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Study course</button>}
               {en.progress===100 && <button onClick={()=>{ const cert=state.certificates.find(c=>c.id===en.certificateId); const emp2=state.employees.find(e=>e.id===en.employeeId); const tr2=state.trainings.find(t=>t.id===en.trainingId); if(cert&&emp2&&tr2) printCertificate({companyName:state.companyName, cert, employee:emp2, training:tr2}); }} style={{fontSize:11,background:'#4C8577',color:'#fff',border:'none',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Certificate</button>}
               {!isEmployee && <button onClick={()=>{ if(confirm('Unenroll?')) update(s=>{ s.enrollments=s.enrollments.filter(x=>x.id!==en.id); s.certificates=s.certificates.filter(c=>c.id!==en.certificateId); }); }} style={{fontSize:11,background:'transparent',border:'1px solid rgba(226,115,91,0.4)',color:'#8C3B28',padding:'5px 8px',borderRadius:5,cursor:'pointer'}}>Remove</button>}
               {isEmployee && en.employeeId===myId && en.progress<100 && <span style={{fontSize:10,opacity:0.55}}>HR unenrolls</span>}
@@ -1179,54 +1166,211 @@ function MyProfile({state}){
   </>);
 }
 
+
+const COURSE_LESSONS = {
+  'Workplace Safety Essentials': [
+    {heading:'Recognising hazards before harm occurs',body:'A hazard is anything with the potential to cause injury, illness or damage. Risk is the combination of how likely harm is and how serious the outcome could be. Common workplace hazards include wet floors, exposed wiring, blocked exits, unguarded machinery, unsafe lifting, poor lighting, fatigue and aggressive behaviour. A near miss is an event that could have caused harm even when nobody was injured; it should be reported because it reveals a weakness in the system.',scenario:'A worker notices a loose cable crossing a busy walkway. Nobody has tripped yet. Treat this as a hazard now: keep people away, report it and arrange a safe repair rather than waiting for an accident.',activity:'Walk through your work area and list five hazards. For each one, record who could be harmed, the possible consequence and one practical control.'},
+    {heading:'Using personal protective equipment correctly',body:'Personal protective equipment (PPE) is the last line of defence after hazards have been eliminated, substituted or controlled through engineering and safe procedures. Select PPE for the actual task: examples include safety footwear, gloves, eye protection, hearing protection, helmets and high-visibility clothing. PPE must fit, be suitable for the hazard, be inspected before use, cleaned and stored correctly. Damaged or poorly fitting equipment should be replaced.',scenario:'A colleague uses ordinary spectacles instead of approved impact-rated eye protection while grinding. The equipment may look similar, but it has not been designed to protect against flying particles.',activity:'Choose one task in your workplace. Identify the hazard, the required PPE, how to inspect it and when it must be replaced.'},
+    {heading:'Fire prevention and emergency response',body:'Prevent fires by controlling ignition sources, storing flammable materials safely, maintaining electrical equipment and keeping escape routes clear. Know the alarm signal, nearest safe exits, assembly point and the person responsible for coordinating evacuation. When an alarm sounds, stop work, leave promptly by the safest route, do not use lifts and do not re-enter until authorised. Only use firefighting equipment if trained, the fire is small, an escape route remains available and doing so does not put anyone at risk.',scenario:'Smoke is visible in a storage room. Do not open the door to investigate or collect belongings. Raise the alarm, evacuate and report the location to the response team.',activity:'Draw a simple evacuation route from your normal workstation and identify an alternative exit and assembly point.'},
+    {heading:'Safe work practices, ergonomics and incident reporting',body:'Safe work depends on clear procedures, maintained equipment, competent supervision and workers who stop when a task becomes unsafe. Use mechanical aids or team lifting for heavy or awkward loads; keep loads close to the body and avoid twisting. Set screens, chairs and work surfaces to reduce strain. Report injuries, unsafe conditions, near misses and property damage promptly, using factual details: what happened, where, when, who was involved and what immediate action was taken.',scenario:'A worker strains their back while lifting a box alone. The report should identify the load, lifting conditions, available equipment and any procedure that was missing or not followed—not assign blame without evidence.',activity:'Draft a short near-miss report using the facts in the scenario. Suggest one immediate action and one longer-term prevention measure.'},
+    {heading:'Putting the safety system into daily practice',body:'A safe workplace is maintained through repeated checks, consultation, training and follow-up. Supervisors should make responsibilities clear, investigate causes rather than blame individuals, and verify that corrective actions work. Workers should participate in briefings, follow approved procedures and raise concerns. Safety rules and legal duties differ by country and industry, so organisations must check the requirements of the jurisdiction and competent regulator where they operate.',scenario:'The same trip hazard appears in weekly inspections. Repeated reminders are not enough; the organisation should investigate why the route remains obstructed and change storage, layout or accountability.',activity:'Create a three-point safety improvement plan: the issue, the person responsible and the date the control will be checked.'}
+  ],
+  'HR Compliance & Ethics': [
+    {heading:'Professional conduct and conflicts of interest',body:'A code of conduct explains expected behaviour, including honesty, respect, responsible use of company resources, confidentiality and compliance with workplace rules. A conflict of interest occurs when personal, family or financial interests could influence—or appear to influence—a work decision. The correct response is to disclose the conflict promptly, avoid participating in the affected decision and follow the organisation’s documented review process.',scenario:'A manager is asked to shortlist a relative for a vacancy. The manager should disclose the relationship and step away from scoring or approving that application.',activity:'Write down two situations in your role that could create an actual or perceived conflict and how you would disclose them.'},
+    {heading:'Confidentiality and responsible data handling',body:'Employee records may contain identity details, contact information, salary, bank details, health information and performance records. Access should be limited to people with a legitimate business need. Collect only what is necessary, use approved systems, verify recipients before sharing, protect devices and report suspected loss or unauthorised access immediately. Do not send sensitive records to personal email or unapproved messaging accounts.',scenario:'A colleague requests the full payroll spreadsheet by personal email because they are working from home. Confirm their authority and use the approved secure channel instead.',activity:'Review a routine HR task and identify what personal data it uses, who needs access, where it is stored and when it should be securely deleted.'},
+    {heading:'Fair treatment, harassment and respectful workplaces',body:'A respectful workplace is free from bullying, harassment, discrimination, intimidation and retaliation. Managers should respond to concerns promptly, listen without prejudging, preserve confidentiality as far as possible and follow a fair investigation process. Decisions should be based on relevant evidence and consistent criteria. Legal definitions and protected characteristics vary by jurisdiction; employers must apply local law and their own policies together.',scenario:'An employee reports repeated offensive comments from a senior colleague. Do not dismiss the concern as banter or promise absolute secrecy. Explain the process, record the report and refer it through the designated channel.',activity:'Practise a neutral first response to a colleague who reports inappropriate conduct. Include listening, immediate safety and the next step.'},
+    {heading:'Recruitment, records and fair HR decisions',body:'HR decisions should be consistent, documented and based on role-related criteria. Recruitment records should show the job requirements, selection method, interview evidence and reasons for the decision. Employment records should be accurate, access-controlled and updated when circumstances change. Avoid assumptions based on age, family status, disability, nationality or other irrelevant personal characteristics.',scenario:'Two candidates have similar experience, but one interviewer prefers a candidate because they attended the same school. Return to the published job criteria and evidence from the structured interview.',activity:'Build a five-criterion interview scorecard for a role and explain how each criterion relates to job performance.'},
+    {heading:'Raising concerns and applying ethical judgement',body:'Ethical decisions require recognising the issue, checking relevant policy and law, considering who may be affected, seeking appropriate advice and recording the decision. Employees should know how to raise concerns safely and how reports are handled. Retaliation against someone who raises a concern in good faith is unacceptable. When in doubt, pause the action and consult the authorised HR, compliance or legal contact.',scenario:'A supervisor asks you to change an attendance record to make a preferred employee eligible for a bonus. Do not alter the record; preserve the original information and escalate the request.',activity:'Use the steps in this lesson to write a brief response to the scenario, including what you would document and whom you would contact.'}
+  ],
+  'Customer Service Excellence': [
+    {heading:'Understanding customer needs and service standards',body:'Excellent service starts with understanding what the customer is trying to achieve, not simply responding to the words they use. Listen without interrupting, ask focused questions, confirm the issue and explain what will happen next. Service standards should define response times, ownership, accuracy, accessibility and how updates are provided. Never promise an outcome or deadline that you cannot control.',scenario:'A customer says an order is late and they need it for an event tomorrow. Confirm the order reference, delivery status and latest acceptable outcome before offering realistic options.',activity:'Write three open questions that would help you understand a customer’s problem without making assumptions.'},
+    {heading:'Empathy, listening and clear communication',body:'Empathy means acknowledging the customer’s experience while remaining professional. Active listening includes giving attention, paraphrasing the issue, checking understanding and noticing what the customer needs next. Use plain language, avoid jargon and explain unfamiliar terms. A calm tone and clear next step can reduce frustration even when the problem cannot be resolved immediately.',scenario:'A customer repeats the same complaint because previous agents have not explained the delay. Summarise what you heard, acknowledge the repeated effort and state who will own the next update.',activity:'Turn a defensive response such as “That is not our fault” into a helpful, accountable response.'},
+    {heading:'Complaint handling and service recovery',body:'A practical recovery sequence is: listen, acknowledge, investigate, resolve or offer options, and follow up. Separate facts from assumptions. If the issue is outside your authority, explain the escalation route and expected update time. Record the complaint accurately so the organisation can identify recurring failures. Do not argue, blame another team or disclose another customer’s information.',scenario:'A customer was charged twice. Verify the transactions, explain the refund process and timeline, escalate where approval is required and give the customer a reference number.',activity:'Create a five-step response for a complaint that you cannot resolve during the first contact.'},
+    {heading:'Managing expectations and communicating delays',body:'Customers value timely, honest updates. State what is known, what remains uncertain, who is responsible and when the next update will be sent. If a deadline changes, tell the customer before they have to chase you. Offer alternatives where possible and record commitments so another colleague can continue the case without making the customer repeat everything.',scenario:'A replacement item will take three extra days. Contact the customer with the revised date, reason if confirmed, available alternatives and a specific time for the next update.',activity:'Draft a concise delay update that is honest, empathetic and includes a clear next action.'},
+    {heading:'Learning from feedback and measuring service quality',body:'Useful service measures may include first-contact resolution, response time, complaint recurrence, customer satisfaction and quality review results. Metrics need context: a fast response is not good service if the answer is wrong. Review feedback for patterns, identify root causes and agree improvements with owners and deadlines. Protect customer information when analysing or sharing examples.',scenario:'A team’s response time improves but repeat complaints increase. Investigate whether agents are closing cases too early or giving incomplete answers.',activity:'Choose two service measures for your team and explain what behaviour each one should encourage—and what it might accidentally reward.'}
+  ],
+  'Work-Life Balance': [
+    {heading:'Recognising stress and early signs of burnout',body:'Work-related stress can affect concentration, sleep, mood, relationships and physical wellbeing. Burnout is commonly associated with sustained workplace stress that has not been successfully managed; warning signs may include exhaustion, cynicism or detachment, and reduced professional effectiveness. These signs are not a personal failure. Workload, unclear expectations, low control, poor support and repeated recovery-free periods can all contribute.',scenario:'A dependable colleague begins missing deadlines, withdrawing from meetings and making unusual errors. A supportive manager should check in privately, listen and explore work-related causes rather than label the person as lazy.',activity:'Identify three early warning signs you might notice in yourself or a team and one safe action for each.'},
+    {heading:'Prioritising work and managing time realistically',body:'Effective time management begins with agreeing priorities and outcomes. Separate urgent work from important work, break large tasks into smaller actions and estimate effort realistically. Use focused work periods and planned breaks; protect time for tasks requiring concentration. When capacity is exceeded, raise the conflict early and ask which priority should move rather than silently accepting impossible deadlines.',scenario:'Three managers assign tasks due on the same afternoon. Clarify the business impact and deadlines with your supervisor and agree the order before work is compromised.',activity:'Plan a realistic workday with three priority outcomes, focused blocks, breaks and one contingency buffer.'},
+    {heading:'Healthy boundaries and sustainable availability',body:'Boundaries make expectations about availability, workload and communication clearer. Agree working hours, response expectations and escalation arrangements with your manager and team. Use leave and breaks appropriately, and avoid treating constant availability as proof of commitment. Managers should model boundaries and ensure urgent cover does not depend on one person being permanently online.',scenario:'A team chat continues sending non-urgent messages late at night. Agree a channel for genuine emergencies and schedule ordinary requests for working hours.',activity:'Write a respectful boundary statement that explains your availability and how urgent matters should be handled.'},
+    {heading:'Recovery, wellbeing and asking for support',body:'Recovery includes adequate rest, movement, social connection and time away from work. Small routines can help, but individual habits cannot compensate for unsafe workloads or poor management. Seek support early through a manager, HR, employee assistance service or qualified health professional where available. Respect colleagues’ privacy and do not pressure anyone to disclose personal health details.',scenario:'A team member says their workload is affecting their sleep. Listen, ask what work adjustments may help and explain available support without attempting to diagnose them.',activity:'Design a practical weekly recovery plan and identify one workplace change that would make it more achievable.'},
+    {heading:'Building a team culture that prevents burnout',body:'Sustainable teams plan capacity, clarify roles, review workload distribution and make it safe to raise concerns. Managers should monitor patterns such as persistent overtime, unused leave, repeated errors and high turnover. Interventions may include reprioritising work, adding cover, improving tools or changing unrealistic service expectations. Wellbeing initiatives should be evaluated alongside working conditions.',scenario:'One employee handles every urgent customer escalation. Cross-train colleagues, document the process and rotate responsibility to reduce dependency and fatigue.',activity:'Recommend two team-level changes that could reduce avoidable stress and describe how you would measure whether they help.'}
+  ],
+  'Grit & Resilience': [
+    {heading:'Understanding grit, resilience and realistic goals',body:'Grit is often described as sustained interest and effort toward long-term goals; resilience is the capacity to adapt and recover when facing difficulty. Neither means ignoring harm, refusing help or working without limits. Useful goals are specific, meaningful and broken into milestones. Progress should be reviewed so that persistence remains connected to evidence and purpose.',scenario:'A project misses its first milestone. The team reviews what happened, adjusts the plan and keeps the meaningful outcome while changing an ineffective method.',activity:'Choose a meaningful work goal and break it into three milestones with evidence that will show progress.'},
+    {heading:'Learning from setbacks with a growth mindset',body:'A growth mindset treats skills as developable through practice, feedback, effective strategies and support. It does not mean every outcome is within personal control. After a setback, distinguish facts from interpretations, identify what was controllable, seek feedback and decide what to try differently. Avoid turning one mistake into a fixed judgement about your ability.',scenario:'A presentation receives critical feedback. Instead of concluding “I am bad at presenting”, identify the specific issue—such as unclear structure—and practise a revised opening.',activity:'Use a recent manageable setback to write: what happened, what I learned, what I will change and what support I need.'},
+    {heading:'Managing pressure and solving problems step by step',body:'Under pressure, people can rush, narrow their attention or react emotionally. Pause where possible, define the problem, gather reliable information, identify options and assess risks before acting. Break complex work into the next safe and useful step. Escalate early when the impact exceeds your authority or expertise.',scenario:'A key system becomes unavailable shortly before a deadline. Confirm the scope, activate the approved fallback, inform affected people and avoid unapproved workarounds that could expose data.',activity:'Create a simple response plan for a work disruption: first action, person to notify, fallback and recovery check.'},
+    {heading:'Using feedback, support and reflection',body:'Resilience is strengthened by relationships and constructive feedback, not by handling every challenge alone. Ask specific questions, listen for actionable information and clarify what good performance looks like. Reflection should focus on learning and next steps rather than blame. Managers can help by making feedback timely, respectful and linked to observable behaviour.',scenario:'A colleague says your handovers are incomplete. Ask which information is missing, agree a checklist and review the next two handovers together.',activity:'Prepare three questions you could ask a trusted colleague or manager to get useful feedback on a current goal.'},
+    {heading:'Maintaining progress without sacrificing wellbeing',body:'Long-term performance requires pacing, rest, flexibility and willingness to revise goals when circumstances change. Track progress, celebrate meaningful milestones and notice when a strategy is no longer effective. Persistence is not the same as staying with an unsafe or unethical course of action. Seek help, reset priorities or stop when the evidence calls for it.',scenario:'A team continues using an outdated process because “we have always done it this way”. Resilience means learning and adapting, not defending an ineffective routine.',activity:'Write a personal progress review with one achievement, one lesson, one adjustment and one boundary that will protect sustainable effort.'}
+  ],
+  'Effective Communication': [
+    {heading:'Choosing the right message and channel',body:'Effective communication starts with purpose: inform, request, decide, resolve or document. Consider the audience, urgency, sensitivity and need for a record. Use a conversation for complex or emotional issues, an approved written channel for decisions and records, and accessible formats where needed. Sensitive employee or customer information must only be shared through authorised channels with appropriate recipients.',scenario:'A performance concern is being discussed in a large group chat. Move the sensitive discussion to a private, appropriate channel and document agreed actions securely.',activity:'Choose three routine work messages and explain the best channel and why it fits each one.'},
+    {heading:'Writing clearly and professionally',body:'A clear work message puts the main point early, uses short sentences, names the required action and gives a realistic deadline. Use headings or bullets for complex instructions. Check names, dates, figures and attachments before sending. Avoid ambiguous phrases such as “soon” or “handle this”; state who will do what and by when.',scenario:'“Please sort the report quickly” is unclear. A stronger request names the report, required figures, owner and agreed due date.',activity:'Rewrite a vague work request as a concise message with context, action, owner and deadline.'},
+    {heading:'Active listening and asking better questions',body:'Active listening means giving attention, allowing the speaker to finish, asking clarifying questions and summarising the key message. Open questions invite explanation; closed questions confirm specific facts. Do not assume silence means agreement. Check understanding, especially when instructions, risks or deadlines matter.',scenario:'A colleague says a process is “not working”. Ask what step fails, when it occurs, what they expected and what evidence they have before proposing a fix.',activity:'Prepare two open questions and two confirmation questions for a work problem you need to understand.'},
+    {heading:'Giving and receiving constructive feedback',body:'Useful feedback is timely, specific, respectful and focused on observable behaviour and its impact. Describe the situation, the behaviour and the effect, then invite the other person’s perspective and agree a practical next step. When receiving feedback, listen, ask for an example and decide what action is appropriate. Avoid labels, public humiliation and personal attacks.',scenario:'Instead of saying “You are careless”, explain that the client report contained two incorrect figures, describe the impact and agree a checking step before submission.',activity:'Draft one feedback statement using situation, behaviour and impact, followed by a question that invites discussion.'},
+    {heading:'Meetings, handovers and communication across teams',body:'A useful meeting has a purpose, the right participants and a clear outcome. Share an agenda, keep discussion focused and record decisions, owners and due dates. Good handovers include current status, relevant facts, outstanding risks, next action and contact details. In remote or cross-cultural teams, avoid idioms, confirm time zones and check understanding without making assumptions.',scenario:'A shift ends with an unresolved customer issue. A complete handover records the case reference, what has been checked, what remains outstanding, the promised update time and the next owner.',activity:'Create a short handover note for an unfinished task using status, evidence, risk, next action, owner and deadline.'}
+  ]
+};
+const COURSE_QUIZZES = {
+  'Workplace Safety Essentials': [
+    {q:'A hazard is best described as:',a:['Anything with potential to cause harm','An injury that has already happened','Only a broken machine'],correct:0},
+    {q:'A near miss should be reported because:',a:['It proves someone is at fault','It reveals a risk before harm occurs','No injury means no action is needed'],correct:1},
+    {q:'PPE should normally be selected after:',a:['Hazards are assessed and higher-level controls considered','A worker chooses what looks comfortable','An incident has happened'],correct:0},
+    {q:'If PPE is damaged, you should:',a:['Continue carefully','Share it with a colleague','Stop using it and report/replace it'],correct:2},
+    {q:'When an evacuation alarm sounds, you should:',a:['Collect personal belongings first','Leave by a safe route and go to the assembly point','Use the lift to save time'],correct:1},
+    {q:'A safe manual lift generally involves:',a:['Keeping the load close and avoiding twisting','Twisting while holding the load away','Lifting beyond your capability'],correct:0},
+    {q:'An incident report should contain:',a:['Rumours about who is responsible','Factual details, location, time and action taken','Only the injured person’s opinion'],correct:1},
+    {q:'Who has a role in reporting workplace hazards?',a:['Only the safety manager','Only supervisors','Everyone who identifies a hazard'],correct:2},
+    {q:'Repeated blocked exits require:',a:['A lasting control and follow-up','Another reminder only','Ignoring it if no fire occurred'],correct:0},
+    {q:'Safety rules should be checked against:',a:['A colleague’s memory','The relevant local law, regulator and workplace procedure','Rules from an unrelated country'],correct:1}
+  ],
+  'HR Compliance & Ethics': [
+    {q:'A conflict of interest should be:',a:['Disclosed promptly and managed transparently','Hidden if no one asks','Decided privately by the person involved'],correct:0},
+    {q:'Employee records should be accessed by:',a:['Anyone in the company','Only people with a legitimate authorised need','All external suppliers'],correct:1},
+    {q:'The safest response to a harassment report is to:',a:['Dismiss it as a joke','Promise absolute secrecy','Listen, record appropriately and follow the reporting process'],correct:2},
+    {q:'Fair recruitment decisions should be based on:',a:['Role-related criteria and evidence','Personal similarity to the interviewer','Unverified assumptions'],correct:0},
+    {q:'If asked to falsify an attendance record, you should:',a:['Make the change if a manager asks','Preserve accurate records and escalate the request','Delete the original record'],correct:1},
+    {q:'Data minimisation means:',a:['Collecting only information needed for a defined purpose','Collecting every possible detail','Keeping data forever'],correct:0},
+    {q:'Confidential information should be sent:',a:['To any personal email for convenience','In a public group chat','Only through approved channels to authorised recipients'],correct:2},
+    {q:'A fair investigation should:',a:['Assume the accused person is guilty','Consider evidence impartially and follow policy','Share details widely'],correct:1},
+    {q:'Retaliation against a good-faith report is:',a:['Acceptable if the report is inconvenient','A management preference','Unacceptable and should be addressed'],correct:2},
+    {q:'When uncertain about an ethical decision, you should:',a:['Pause and seek authorised advice','Proceed secretly','Destroy related records'],correct:0}
+  ],
+  'Customer Service Excellence': [
+    {q:'The first step in understanding a complaint is to:',a:['Interrupt with a solution','Listen and clarify the customer’s issue','Blame another department'],correct:1},
+    {q:'Empathy in service means:',a:['Agreeing to every demand','Acknowledging the customer’s experience respectfully','Making promises you cannot keep'],correct:1},
+    {q:'A good recovery process includes:',a:['Listen, acknowledge, investigate, resolve and follow up','Argue until the customer stops','Close the case without explanation'],correct:0},
+    {q:'If a resolution is outside your authority, you should:',a:['Explain the escalation and next update','Ignore the customer','Invent an approval'],correct:0},
+    {q:'When a delivery is delayed, communicate:',a:['Only when the customer complains again','Confirmed facts, options and next update time','An unverified delivery promise'],correct:1},
+    {q:'A service metric should be interpreted:',a:['With context and quality evidence','As the only measure of success','Without considering repeat complaints'],correct:0},
+    {q:'A useful open question is:',a:['“You are wrong, aren’t you?”','“Why did you do that?”','“Can you describe what happened?”'],correct:2},
+    {q:'Complaint records help the organisation:',a:['Identify recurring causes and improve service','Punish every customer','Avoid investigating patterns'],correct:0},
+    {q:'A customer should not have to:',a:['Receive a reference number','Repeat the same information unnecessarily','Be told the next step'],correct:1},
+    {q:'A fast response is not good service if it is:',a:['Accurate','Helpful','Incorrect or incomplete'],correct:2}
+  ],
+  'Work-Life Balance': [
+    {q:'Burnout is commonly associated with:',a:['Sustained unmanaged workplace stress','A single busy afternoon only','Lack of ambition'],correct:0},
+    {q:'When priorities conflict, an employee should:',a:['Silently accept every deadline','Clarify impact and agree priorities with the manager','Ignore all tasks'],correct:1},
+    {q:'Healthy boundaries help to:',a:['Make availability expectations clear','Prevent all teamwork','Avoid accountability'],correct:0},
+    {q:'A wellbeing habit can:',a:['Replace safe staffing and workload planning','Support recovery but not replace good work design','Guarantee nobody experiences stress'],correct:1},
+    {q:'A supportive response to a colleague under strain is to:',a:['Diagnose their condition','Listen and discuss work support options','Share their concern with the whole team'],correct:1},
+    {q:'A sustainable team should:',a:['Depend on one person for every emergency','Ignore overtime patterns','Review workload and build appropriate cover'],correct:2},
+    {q:'If capacity is exceeded, raise it:',a:['Early, with clear priorities and options','Only after a deadline is missed','Never'],correct:0},
+    {q:'Managers should monitor:',a:['Only output numbers','Workload patterns, overtime and repeated errors','Private medical details without permission'],correct:1},
+    {q:'Recovery may include:',a:['Rest, movement and time away from work','Working through every break','Constant online availability'],correct:0},
+    {q:'Wellbeing initiatives should be assessed alongside:',a:['Workload and working conditions','Office decorations only','Social media likes'],correct:0}
+  ],
+  'Grit & Resilience': [
+    {q:'Resilience is best understood as:',a:['Never asking for help','Adapting and recovering when facing difficulty','Ignoring unsafe conditions'],correct:1},
+    {q:'A useful goal should be:',a:['Meaningful and broken into milestones','Impossible to measure','Changed every hour'],correct:0},
+    {q:'A growth mindset focuses on:',a:['Skills developing through practice, feedback and support','Believing effort alone guarantees success','Avoiding difficult tasks'],correct:0},
+    {q:'After a setback, first:',a:['Separate facts from assumptions and identify learning','Blame a colleague','Hide the outcome'],correct:0},
+    {q:'Under pressure, a useful approach is to:',a:['Rush without checking','Define the problem, gather facts and assess options','Avoid informing anyone'],correct:1},
+    {q:'Constructive feedback should be:',a:['Specific and linked to observable behaviour','Personal and insulting','Shared publicly to embarrass'],correct:0},
+    {q:'Persistence should not mean:',a:['Learning from evidence','Adjusting an ineffective strategy','Continuing an unsafe or unethical action'],correct:2},
+    {q:'When a disruption exceeds your authority, you should:',a:['Escalate and use an approved fallback','Invent a workaround','Keep quiet'],correct:0},
+    {q:'Resilience is strengthened by:',a:['Supportive relationships and useful feedback','Isolation at all times','Never taking breaks'],correct:0},
+    {q:'A progress review should include:',a:['Only failures','Achievements, lessons and adjustments','Personal blame'],correct:1}
+  ],
+  'Effective Communication': [
+    {q:'Before sending a message, identify its:',a:['Purpose and audience','Font colour only','Length only'],correct:0},
+    {q:'A clear request should state:',a:['“Do it soon”','Action, owner and realistic deadline','Only the sender’s frustration'],correct:1},
+    {q:'Active listening includes:',a:['Interrupting to finish sentences','Assuming silence means agreement','Summarising and checking understanding'],correct:2},
+    {q:'Sensitive employee information should be:',a:['Shared in a public group','Sent only to authorised recipients through approved channels','Forwarded to personal accounts'],correct:1},
+    {q:'Constructive feedback should focus on:',a:['Observable behaviour and its impact','Personality labels','Rumours'],correct:0},
+    {q:'A useful handover includes:',a:['Status, risks, next action, owner and deadline','Only “please continue”','Unverified assumptions'],correct:0},
+    {q:'An open question is useful because it:',a:['Invites explanation','Forces a yes/no answer','Prevents clarification'],correct:0},
+    {q:'For complex or emotional issues, a suitable channel may be:',a:['A public noticeboard','A private conversation with appropriate follow-up record','An anonymous group chat'],correct:1},
+    {q:'Meeting notes should capture:',a:['Decisions, owners and due dates','Every unrelated conversation','Only attendance'],correct:0},
+    {q:'In cross-time-zone teams, confirm:',a:['Local time and deadlines','That everyone uses the same idioms','Nothing; assumptions are enough'],correct:0}
+  ]
+};
+function courseLessonMaterial(courseTitle,index){
+  const lessons=COURSE_LESSONS[courseTitle]||[];
+  return lessons[index]||{heading:'Lesson notes',body:'Read the lesson summary, discuss how the topic applies to your role and follow your organisation’s approved procedures. Requirements may differ by country, sector and workplace.',scenario:'Consider a realistic situation from your team and identify the safest, fairest and most practical response.',activity:'Write one action you can apply at work and how you will know it has helped.'};
+}
+
 function CourseView({tr, state, update, showToast, close}){
   const [answers,setAnswers]=useState({});
   const [showResult,setShowResult]=useState(null);
-  if(!tr) return <div style={{padding:20,color:'#8C3B28'}}>Course not found — please click Reset demo or hard refresh (Ctrl+Shift+R).</div>;
-  const isEmployee=state.currentRole==='employee';
+  const [selectedLesson,setSelectedLesson]=useState(0);
+  if(!tr) return <div style={{padding:20,color:'#8C3B28'}}>Course not found — please refresh and try again.</div>;
   const myId=state.viewingEmployeeId||state.employees[0]?.id;
-  const quizQuestions=[
-    {q:'What is the primary goal of this training?', a:['Compliance','Entertainment','None'], correct:0},
-    {q:'Pass mark for the test is?', a:['50%','70%','90%'], correct:1},
-    {q:'Who should report an incident?', a:['Only manager','Everyone','No one'], correct:1},
-  ];
+  const quizQuestions=COURSE_QUIZZES[tr.title]||COURSE_QUIZZES['Effective Communication'];
+  const quizModule=tr.modules.find(m=>m.type==='quiz');
+  const enrollment=state.enrollments.find(e=>e.employeeId===myId&&e.trainingId===tr.id);
+  const completedIds=enrollment?.completedModules||[];
+  function markModuleComplete(module){
+    update(s=>{
+      let record=s.enrollments.find(e=>e.employeeId===myId&&e.trainingId===tr.id);
+      if(!record){record={id:uid(),employeeId:myId,trainingId:tr.id,progress:0,completedModules:[],enrolledAt:new Date().toISOString().slice(0,10),completedAt:null,score:null,certificateId:null};s.enrollments.push(record);}
+      if(!record.completedModules.includes(module.id)) record.completedModules.push(module.id);
+      record.progress=Math.round(100*record.completedModules.length/tr.modules.length);
+      if(record.progress===100&&!record.certificateId){const cid=uid();record.certificateId=cid;record.completedAt=new Date().toISOString().slice(0,10);s.certificates.push({id:cid,employeeId:myId,trainingId:tr.id,issuedAt:record.completedAt,score:record.score||null});}
+    });
+    showToast('Lesson marked complete');
+  }
   function submitQuiz(){
-    let score=0; quizQuestions.forEach((qq,i)=>{ if(answers[i]===qq.correct) score++; });
+    const score=quizQuestions.reduce((total,question,index)=>total+(answers[index]===question.correct?1:0),0);
     const pct=Math.round(100*score/quizQuestions.length);
     const pass=pct>=70;
-    setShowResult({score:pct, pass});
+    setShowResult({score:pct,pass});
     if(pass){
       update(s=>{
-        let my=s.enrollments.find(e=>e.employeeId===myId && e.trainingId===tr.id);
-        if(!my){ my={id:uid(), employeeId:myId, trainingId:tr.id, progress:0, completedModules:[], enrolledAt:new Date().toISOString().slice(0,10), completedAt:null, score:null, certificateId:null}; s.enrollments.push(my); }
-        const quizMod=tr.modules.find(m=>m.type==='quiz');
-        if(quizMod && !my.completedModules.includes(quizMod.id)) my.completedModules.push(quizMod.id);
-        tr.modules.filter(m=>m.type!=='quiz').forEach(m=>{ if(!my.completedModules.includes(m.id)) my.completedModules.push(m.id); });
-        my.progress=Math.round(100*my.completedModules.length/tr.modules.length);
-        my.score=pct;
-        if(my.progress===100 && !my.certificateId){ const cid=uid(); my.certificateId=cid; my.completedAt=new Date().toISOString().slice(0,10); s.certificates.push({id:cid, employeeId:myId, trainingId:tr.id, issuedAt:my.completedAt, score:pct}); }
+        let record=s.enrollments.find(e=>e.employeeId===myId&&e.trainingId===tr.id);
+        if(!record){record={id:uid(),employeeId:myId,trainingId:tr.id,progress:0,completedModules:[],enrolledAt:new Date().toISOString().slice(0,10),completedAt:null,score:null,certificateId:null};s.enrollments.push(record);}
+        if(quizModule&&!record.completedModules.includes(quizModule.id))record.completedModules.push(quizModule.id);
+        record.score=pct;
+        record.progress=Math.round(100*record.completedModules.length/tr.modules.length);
+        if(record.progress===100&&!record.certificateId){const cid=uid();record.certificateId=cid;record.completedAt=new Date().toISOString().slice(0,10);s.certificates.push({id:cid,employeeId:myId,trainingId:tr.id,issuedAt:record.completedAt,score:pct});}
       });
     }
   }
+  const lessonModules=tr.modules.filter(m=>m.type!=='quiz');
+  const selectedModule=lessonModules[selectedLesson]||lessonModules[0];
+  const material=selectedModule?courseLessonMaterial(tr.title,selectedLesson):null;
   return <>
-    <div style={{background:'rgba(32,21,38,0.05)',borderRadius:8,padding:12,marginBottom:12}}><div style={{fontSize:11,opacity:0.6}}>{tr.category} · {tr.duration} · {tr.required?'Required':''}</div><div style={{fontWeight:700,marginTop:4}}>{tr.title}</div><div style={{fontSize:12,opacity:0.7,marginTop:4}}>{tr.description}</div></div>
-    <div style={{fontSize:11,fontWeight:600,letterSpacing:0.05+'em',textTransform:'uppercase',opacity:0.6,marginBottom:6}}>Modules — Staff & HR can view & take tests</div>
-    {tr.modules.map((m,i)=> <div key={m.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#fff',border:'1px solid rgba(32,21,38,0.08)',borderRadius:6,marginBottom:6}}>
-      <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{i+1}. {m.title} <span style={{fontSize:10,background:m.type==='quiz'?'#E2735B':'#E0E2E8',color:m.type==='quiz'?'#fff':'#201526',padding:'2px 6px',borderRadius:10}}>{m.type}</span></div><div style={{fontSize:11,opacity:0.6}}>{m.duration} · {m.content}</div></div>
-      {m.type==='quiz' ? <button onClick={()=>{ setShowResult(null); setAnswers({}); document.getElementById('quiz-area')?.scrollIntoView({behavior:'smooth'}); }} style={{background:'#4C8577',color:'#fff',border:'none',padding:'6px 10px',borderRadius:5,fontSize:11,cursor:'pointer'}}>Take Test</button> : <span style={{fontSize:11,background:'#EDEEF2',padding:'4px 8px',borderRadius:5}}>View</span>}
-    </div>)}
-    <div id="quiz-area" style={{marginTop:14,background:'#fff',border:'1px solid #ddd',borderRadius:8,padding:14}}>
-      <div style={{fontWeight:700,fontSize:13}}>Test — {tr.title} (70% to pass)</div>
-      {showResult ? <div style={{textAlign:'center',padding:16}}><div style={{fontSize:22,fontWeight:700,color: showResult.pass?'#4C8577':'#E2735B'}}>{showResult.pass?'Passed ✓':'Failed'}</div><div style={{fontFamily:'monospace',fontSize:18,marginTop:6}}>{showResult.score}%</div><div style={{fontSize:11,opacity:0.6,marginTop:4}}>{showResult.pass?'Certificate generated in Training → Certificates':'Try again — review modules'}</div><button onClick={()=>setShowResult(null)} style={{marginTop:10,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Retake</button></div> :
-      <div>
-        {quizQuestions.map((qq,i)=> <div key={i} style={{marginTop:10,padding:10,background:'rgba(32,21,38,0.04)',borderRadius:6}}>
-          <div style={{fontSize:12,fontWeight:600}}>{i+1}. {qq.q}</div>
-          <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>{qq.a.map((opt,oi)=> <label key={oi} style={{fontSize:11,background: answers[i]===oi?'#201526':'#fff',color:answers[i]===oi?'#fff':'#201526',border:'1px solid #ddd',padding:'5px 10px',borderRadius:20,cursor:'pointer'}}><input type="radio" name={`q${i}`} checked={answers[i]===oi} onChange={()=>setAnswers({...answers,[i]:oi})} style={{display:'none'}}/>{opt}</label>)}</div>
-        </div>)}
-        <button onClick={submitQuiz} style={{marginTop:12,background:'#E2735B',color:'#fff',border:'none',padding:'8px 14px',borderRadius:6,fontSize:12,cursor:'pointer',width:'100%'}}>Submit Test</button>
-        <div style={{fontSize:10,opacity:0.55,marginTop:6}}>Both Staff and HR/Admin can take this test — same questions, offline scored, progress saved.</div>
-      </div>}
+    <div style={{background:'rgba(32,21,38,0.05)',borderRadius:8,padding:12,marginBottom:12}}>
+      <div style={{fontSize:11,opacity:0.6}}>{tr.category} · {tr.duration} · {tr.required?'Required':''}</div>
+      <div style={{fontWeight:700,marginTop:4}}>{tr.title}</div>
+      <div style={{fontSize:12,opacity:0.7,marginTop:4}}>{tr.description}</div>
+      <div style={{fontSize:11,marginTop:8,fontWeight:600}}>Course progress: {enrollment?.progress||0}% · {completedIds.length}/{tr.modules.length} learning activities completed</div>
     </div>
+    <div style={{fontSize:11,fontWeight:600,letterSpacing:0.05+'em',textTransform:'uppercase',opacity:0.6,marginBottom:6}}>Course lessons</div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:7,marginBottom:12}}>
+      {lessonModules.map((m,i)=><button key={m.id} onClick={()=>setSelectedLesson(i)} style={{textAlign:'left',padding:10,borderRadius:7,border:selectedLesson===i?'2px solid #4C8577':'1px solid #ddd',background:selectedLesson===i?'#edf5f2':'#fff',color:'#201526',cursor:'pointer'}}>
+        <div style={{fontSize:11,opacity:0.6}}>LESSON {i+1} · {m.duration}</div><div style={{fontSize:12,fontWeight:700,marginTop:3}}>{m.title}</div><div style={{fontSize:10,marginTop:4,color:completedIds.includes(m.id)?'#287454':'#777'}}>{completedIds.includes(m.id)?'Completed ✓':'Not completed'}</div>
+      </button>)}
+    </div>
+    {selectedModule&&material&&<section style={{background:'#fff',color:'#201526',border:'1px solid #ddd',borderRadius:8,padding:16,marginBottom:14}}>
+      <div style={{fontSize:10,fontWeight:700,letterSpacing:'.08em',color:'#4C8577'}}>STUDY LESSON {selectedLesson+1}</div>
+      <h3 style={{fontSize:18,fontWeight:700,margin:'5px 0 12px'}}>{material.heading}</h3>
+      <p style={{fontSize:13,lineHeight:1.75,whiteSpace:'pre-wrap'}}>{material.body}</p>
+      <div style={{background:'#f4f5f6',borderLeft:'3px solid #C9A227',padding:12,borderRadius:5,marginTop:12}}>
+        <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',marginBottom:5}}>Workplace example</div><p style={{fontSize:12,lineHeight:1.6,margin:0}}>{material.scenario}</p>
+      </div>
+      <div style={{background:'#edf5f2',borderLeft:'3px solid #4C8577',padding:12,borderRadius:5,marginTop:10}}>
+        <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',marginBottom:5}}>Practical exercise</div><p style={{fontSize:12,lineHeight:1.6,margin:0}}>{material.activity}</p>
+      </div>
+      <button onClick={()=>markModuleComplete(selectedModule)} disabled={completedIds.includes(selectedModule.id)} style={{marginTop:12,background:completedIds.includes(selectedModule.id)?'#e3e8e5':'#4C8577',color:completedIds.includes(selectedModule.id)?'#287454':'#fff',border:'none',padding:'9px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:completedIds.includes(selectedModule.id)?'default':'pointer'}}>{completedIds.includes(selectedModule.id)?'Lesson completed ✓':'Mark lesson complete'}</button>
+    </section>}
+    {quizModule&&<section id="quiz-area" style={{marginTop:14,background:'#fff',color:'#201526',border:'1px solid #ddd',borderRadius:8,padding:14}}>
+      <div style={{fontWeight:700,fontSize:15}}>Final assessment — {tr.title}</div>
+      <div style={{fontSize:11,opacity:0.65,marginTop:3}}>{quizQuestions.length} course-specific questions · 70% pass mark · Complete the lessons before attempting the assessment.</div>
+      {showResult?<div style={{textAlign:'center',padding:16}}>
+        <div style={{fontSize:22,fontWeight:700,color:showResult.pass?'#4C8577':'#E2735B'}}>{showResult.pass?'Passed ✓':'Not passed yet'}</div>
+        <div style={{fontFamily:'monospace',fontSize:18,marginTop:6}}>{showResult.score}%</div>
+        <div style={{fontSize:11,opacity:0.7,marginTop:4}}>{showResult.pass?(tr.modules.every(m=>(m.type==='quiz'?true:completedIds.includes(m.id)))?'Assessment passed. Your course completion is being recorded.':'Assessment passed. Complete every lesson to earn your certificate.'):'Review the lessons and try again.'}</div>
+        <button onClick={()=>{setShowResult(null);setAnswers({});}} style={{marginTop:10,background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Retake assessment</button>
+      </div>:<div>
+        {quizQuestions.map((question,index)=><div key={index} style={{marginTop:10,padding:10,background:'rgba(32,21,38,0.04)',borderRadius:6}}>
+          <div style={{fontSize:12,fontWeight:600}}>{index+1}. {question.q}</div>
+          <div style={{display:'flex',gap:8,marginTop:6,flexWrap:'wrap'}}>{question.a.map((option,optionIndex)=><label key={optionIndex} style={{fontSize:11,background:answers[index]===optionIndex?'#201526':'#fff',color:answers[index]===optionIndex?'#fff':'#201526',border:'1px solid #ddd',padding:'6px 10px',borderRadius:20,cursor:'pointer'}}><input type="radio" name={`q-${tr.id}-${index}`} checked={answers[index]===optionIndex} onChange={()=>setAnswers(previous=>({...previous,[index]:optionIndex}))} style={{display:'none'}}/>{option}</label>)}</div>
+        </div>)}
+        <button onClick={submitQuiz} disabled={Object.keys(answers).length!==quizQuestions.length} style={{marginTop:12,background:Object.keys(answers).length===quizQuestions.length?'#E2735B':'#aaa',color:'#fff',border:'none',padding:'9px 14px',borderRadius:6,fontSize:12,cursor:'pointer',width:'100%'}}>Submit assessment</button>
+        <div style={{fontSize:10,opacity:0.55,marginTop:6}}>A pass records the assessment. A certificate is issued only after every lesson and the assessment are completed.</div>
+      </div>}
+    </section>}
     <div style={{marginTop:12,textAlign:'right'}}><button onClick={close} style={{background:'#201526',color:'#fff',border:'none',padding:'7px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>Close</button></div>
   </>;
 }
