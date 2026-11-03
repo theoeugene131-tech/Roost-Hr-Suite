@@ -11,7 +11,7 @@ export default function HomePage() {
     <main style={{fontFamily:"Arial, sans-serif",color:ink,background:"#fff",overflow:"hidden"}}>
       <header style={{maxWidth:1180,margin:"0 auto",padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:20}}>
         <a href="/" style={{display:"flex",alignItems:"center",gap:11,textDecoration:"none",color:ink,fontWeight:800,fontSize:21,letterSpacing:"-.6px"}}>
-          <span style={{width:35,height:35,background:teal,borderRadius:"11px 11px 11px 3px",display:"inline-block"}}/> MEDASH
+          <span style={{width:35,height:35,background:teal,borderRadius:"11px 11px 11px 3px",display:"inline-block"}}/> ROOST
         </a>
         <nav style={{display:"flex",alignItems:"center",gap:24,fontSize:14,flexWrap:"wrap"}}>
           <a href="#platform" style={{color:muted,textDecoration:"none"}}>Platform</a>
