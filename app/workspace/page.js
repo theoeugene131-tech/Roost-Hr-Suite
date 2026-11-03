@@ -320,8 +320,8 @@ export default function Page(){
   }
 
   useEffect(()=>{
-    const params=new URLSearchParams(window.location.search);
-    const isPublicDemo=params.get('demo')==='1';
+    const demoParams=new URLSearchParams(window.location.search);
+    const isPublicDemo=demoParams.get('demo')==='1';
     setDemoMode(isPublicDemo);
     let loaded=loadState(isPublicDemo ? 'medash_public_demo_v1' : undefined);
     if(loaded){ loaded=migrateState(loaded); setState(loaded); }
