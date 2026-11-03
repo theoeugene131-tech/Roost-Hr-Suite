@@ -23,7 +23,7 @@ const DOC_TYPES = [
   {key:'annual', label:'Annual Appraisal', category:'Appraisals', required:false},
 ];
 const TAB_LABELS = {
-  overview:'Overview', team:'Team', docs:'Documents', regulatory:'Regulatory', training:'Training', leave:'Leave', attendance:'Attendance', org:'Org Chart', runpayroll:'Run payroll', history:'History',
+  overview:'Home', team:'Team roster', docs:'Documents', regulatory:'Regulatory', training:'Training', leave:'Leave', attendance:'Attendance', org:'Org Chart', runpayroll:'Run payroll', history:'History',
   compliance:'Compliance', reviews:'Reviews', hiring:'Hiring', reports:'Reports', myprofile:'My profile'
 };
 function visibleTabs(role){
@@ -501,13 +501,9 @@ export default function Page(){
       <nav className="tabs" aria-label="Main navigation">
         {(() => {
           const navGroups = [
-            {label:'Overview', tabs:['overview']},
-            {label:'People', tabs:['team','docs','org']},
-            {label:'HR Operations', tabs:['training','leave','attendance','hiring']},
-            {label:'Payroll & Compliance', tabs:['runpayroll','history','regulatory','compliance']},
-            {label:'Performance', tabs:['reviews']},
-            {label:'Reports', tabs:['reports']},
-            {label:'My Workspace', tabs:['myprofile']},
+            {label:'HR', tabs:['overview','team','docs','org','leave','attendance','reviews','hiring','myprofile']},
+            {label:'Payroll', tabs:['runpayroll','history','regulatory','compliance','reports']},
+            {label:'Training', tabs:['training']},
           ].map(group=>({...group,tabs:group.tabs.filter(t=>tabs.includes(t))})).filter(group=>group.tabs.length);
           const activeGroup = navGroups.find(group=>group.tabs.includes(currentTab)) || navGroups[0];
           return <>
