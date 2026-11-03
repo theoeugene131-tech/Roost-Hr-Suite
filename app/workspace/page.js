@@ -353,7 +353,7 @@ export default function Page(){
   useEffect(()=>{ if(state) saveState(state,demoMode ? 'medash_public_demo_v1' : undefined); },[state,demoMode]);
   useEffect(()=>{ if(!online) setToast("You are offline — changes will sync when you reconnect."); else if(toast && toast.includes("offline")) setToast("Back online ✓"); },[online]);
 
-  if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Roost…</div>;
+  if(licenseChecking || !state) return <div style={{padding:60,textAlign:'center',color:'#B39FB0'}}>Loading Medash HR Suite…</div>;
   async function handleLicenseSubmit(e){
     e.preventDefault();
     if(!isValidFormat(licenseKey)) { showToast('Invalid key. Format: ROOST-XXXX-XXXX-...'); return; }
@@ -371,7 +371,7 @@ export default function Page(){
     return (
       <div style={{minHeight:'100vh', background:'#241623', color:'#EDEEF2', display:'flex', alignItems:'center', justifyContent:'center', padding:24}}>
         <div style={{maxWidth:520, width:'100%', background:'#EDEEF2', color:'#201526', borderRadius:12, padding:32, boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}}>Roost</div><div style={{fontSize:12,opacity:0.6}}>Payroll, HR & Compliance — SaaS License</div></div></div>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:36,height:36,borderRadius:'50% 50% 50% 6px',background:'#E2735B'}}/><div><div style={{fontFamily:'Newsreader, serif',fontStyle:'italic',fontWeight:700,fontSize:22}} >Medash HR Suite</div><div style={{fontSize:12,opacity:0.6}}>Payroll, HR & Compliance — SaaS License</div></div></div>
           <h2 style={{fontFamily:'Newsreader, serif',fontSize:18,marginBottom:8}}>Enter your license key</h2>
           <p style={{fontSize:13,opacity:0.7,lineHeight:1.5}}>You purchased on <b>Selar</b>. Paste the key from your delivery email. Keys look like <code style={{background:'#fff',padding:'2px 6px',borderRadius:4}}>ROOST-XXXX-XXXX-XXXX</code>. Need help? <a href="https://wa.me/2348026892077" target="_blank" rel="noreferrer" style={{color:'#4C8577',fontWeight:600}}>WhatsApp +234 802 689 2077</a></p>
           <form onSubmit={handleLicenseSubmit} style={{marginTop:16}}>
@@ -438,8 +438,8 @@ export default function Page(){
       `}</style>
 
       <div style={{background: online? '#4C8577':'#E2735B', color:'#fff', textAlign:'center', fontSize:12, padding:'6px 10px', fontWeight:600}}>
-        {online? '● Online — synced':'○ Offline — working locally, will sync when reconnected'} &nbsp;|&nbsp; Roost works fully offline &nbsp;|&nbsp; Licensed {getStoredKey()? `· ${getStoredKey().slice(0,14)}…` : ''}
-        <button onClick={()=>{ if(confirm('Remove license?')){ clearLicense(); setLicenseOk(false); setLicenseKey(''); location.reload(); } }} style={{marginLeft:10, background:'rgba(0,0,0,0.2)', color:'#fff', border:'none', padding:'2px 8px', borderRadius:10, fontSize:10, cursor:'pointer'}}>Sign out</button>
+        {demoMode ? '● FREE DEMO — sample data only; changes stay in this browser' : (online? '● Online — synced':'○ Offline — working locally, will sync when reconnected') + '  |  Medash HR Suite'}
+        {!demoMode && <button onClick={()=>{ if(confirm('Remove license?')){ clearLicense(); setLicenseOk(false); setLicenseKey(''); location.reload(); } }} style={{marginLeft:10, background:'rgba(0,0,0,0.2)', color:'#fff', border:'none', padding:'2px 8px', borderRadius:10, fontSize:10, cursor:'pointer'}}>Sign out</button>}
       </div>
       {toast && <div style={{position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', background:'#201526', color:'#EDEEF2', padding:'10px 16px', borderRadius:8, fontSize:13, zIndex:60}}>{toast}</div>}
 
@@ -448,10 +448,10 @@ export default function Page(){
           <div className="brand-mark"></div>
           <div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <h1 style={{fontFamily:'Newsreader, serif', fontSize:22, fontWeight:600, fontStyle:'italic'}}>Roost</h1>
+              <h1 style={{fontFamily:'Newsreader, serif', fontSize:22, fontWeight:600, fontStyle:'italic'}}>Medash HR Suite</h1>
               <span style={{fontSize:10,background:'rgba(237,238,242,0.08)',border:'1px solid var(--line)',padding:'2px 6px',borderRadius:20,color:'var(--muted)'}}>{state.companyName || '—'}</span>
             </div>
-            <p style={{fontSize:11.5, color:'var(--muted)', marginTop:2}}>Payroll, compliance & HR for teams of 5–20</p>
+            <p style={{fontSize:11.5, color:'var(--muted)', marginTop:2}}>HR Management · Payroll · Training</p>
             <div style={{marginTop:8,display:'flex',gap:6,alignItems:'center'}}>
               <input
                 placeholder="Company name — e.g. GreenField Ltd"
@@ -477,10 +477,10 @@ export default function Page(){
             <button onClick={()=>{
               const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
               const url=URL.createObjectURL(blob);
-              const a=document.createElement('a'); a.href=url; a.download=`roost-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); showToast('Backup saved — keeps all data offline-safe');
+              const a=document.createElement('a'); a.href=url; a.download=`medash-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); showToast('Backup saved — keeps all data offline-safe');
             }} style={{background:'#4C8577',color:'#fff',border:'none',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer',fontWeight:700}}>⬇ Save / Backup</button>
-            <label style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>⬆ Restore<input type="file" accept=".json" style={{display:'none'}} onChange={ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.employees) throw new Error('Invalid backup'); if(confirm(`Restore backup from ${j.companyName||'file'}? This will overwrite current data.`)){ const mig=migrateState(j); setState(mig); saveState(mig); showToast('Backup restored ✓'); }}catch(e){ alert('Invalid backup file'); } }; r.readAsText(f); }}/></label>
-            <button onClick={()=>{ if(confirm('Reset to demo data?')){ const s=seedDemo(); setState(s); saveState(s); showToast('Demo data restored'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Reset demo</button>
+            <label style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>⬆ Restore<input type="file" accept=".json" style={{display:'none'}} onChange={ev=>{ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.employees) throw new Error('Invalid backup'); if(confirm(`Restore backup from ${j.companyName||'file'}? This will overwrite current data.`)){ const mig=migrateState(j); setState(mig); saveState(mig,demoMode ? 'medash_public_demo_v1' : undefined); showToast('Backup restored ✓'); }}catch(e){ alert('Invalid backup file'); } }; r.readAsText(f); }}/></label>
+            <button onClick={()=>{ if(confirm('Reset to demo data?')){ const s=seedDemo(); setState(s); saveState(s,demoMode ? 'medash_public_demo_v1' : undefined); showToast('Demo data restored'); } }} style={{background:'transparent',border:'1px solid var(--line)',color:'var(--muted)',borderRadius:6,padding:'8px 10px',fontSize:11,cursor:'pointer'}}>Reset demo</button>
             {cloudMode
               ? <span style={{fontSize:11,background:'rgba(76,133,119,0.2)',border:'1px solid rgba(76,133,119,0.5)',color:'#7FD1B9',borderRadius:6,padding:'8px 10px'}}>☁ {apiUser.email||apiUser.role}{cloudLoading?' · syncing…':''}</span>
               : cloudBase
@@ -549,7 +549,7 @@ export default function Page(){
         {currentTab==='myprofile' && <MyProfile state={state} />}
       </main>
       <footer style={{borderTop:'1px solid var(--line)',padding:'16px 40px',textAlign:'center',fontSize:12,color:'var(--muted)',background:'rgba(0,0,0,0.15)'}}>
-        Developed by <span style={{color:'var(--paper)',fontWeight:600}}>Next Level Global</span> · Contact <a href="https://wa.me/2348026892077" target="_blank" rel="noopener noreferrer" style={{color:'#25D366',textDecoration:'none',fontWeight:600}}>WhatsApp +234 802 689 2077</a> · Roost works offline
+        Developed by <span style={{color:'var(--paper)',fontWeight:600}}>Next Level Global</span> · Contact <a href="https://wa.me/2348026892077" target="_blank" rel="noopener noreferrer" style={{color:'#25D366',textDecoration:'none',fontWeight:600}}>WhatsApp +234 802 689 2077</a> · Medash HR Suite
       </footer>
 
       {modal && <Modal modal={modal} setModal={setModal} state={state} update={update} showToast={showToast} />}
