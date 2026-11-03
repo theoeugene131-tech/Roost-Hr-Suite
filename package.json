@@ -1,8 +1,8 @@
 {
-  "name": "roost",
+  "name": "roost-hr-suite",
   "version": "1.0.0",
   "private": true,
-  "description": "Roost — Payroll, HR & Compliance for small teams (offline-first)",
+  "description": "Roost HR Suite — independent HR, payroll and employee training workspace",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
